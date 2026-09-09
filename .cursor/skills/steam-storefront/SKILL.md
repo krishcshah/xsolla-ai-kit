@@ -63,10 +63,22 @@ Cookies, then `export XSOLLA_SHOPBUILDER_SESSION='pa-v4-token=<value>'`.
 Each step produces something the next one needs, and two steps are easy to skip with no
 error until much later.
 
-### 1. Dry-run the listing first
+### 1. Create the landing
+
+Every one of these endpoints is keyed by an **existing** landing — the dry run included, so
+this comes first, before there is anything to parse into. `--slug` is the domain label you
+are claiming (e.g. `valheim` → `valheim.xsolla.site`).
 
 ```
-xsolla shopbuilder parse-listing --slug <slug> --type steam \
+xsolla shopbuilder create-website --slug valheim --name "Valheim" --type topup
+```
+
+`--type` accepts only `topup` at creation. That is expected — step 4 sets the real type.
+
+### 2. Dry-run the listing
+
+```
+xsolla shopbuilder parse-listing --slug valheim --type steam \
   --target https://store.steampowered.com/app/892970/Valheim/ --json
 ```
 
@@ -76,17 +88,6 @@ regional or `//store.steampowered.com/app/...` variants.
 **If parsing fails, stop and ask the user.** Do not substitute invented metadata: a
 storefront built from a plausible-looking guess is worse than no storefront, because
 nothing downstream reveals that the title, art and copy were fabricated.
-
-### 2. Create the landing
-
-The listing import writes *into* a landing, so one must exist. `--slug` is the domain label
-you are claiming (e.g. `valheim` → `valheim.xsolla.site`).
-
-```
-xsolla shopbuilder create-website --slug valheim --name "Valheim" --type topup
-```
-
-`--type` accepts only `topup` at creation. That is expected — step 4 sets the real type.
 
 ### 3. Generate the structure from the listing
 
