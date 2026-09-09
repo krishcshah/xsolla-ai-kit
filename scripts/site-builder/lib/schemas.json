@@ -1,0 +1,1695 @@
+{
+  "connect_integration": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "gtm",
+          "googleAnalytics",
+          "facebookPixel",
+          "twitterPixel",
+          "appsFlyer",
+          "adjust",
+          "singular"
+        ],
+        "description": "Connector to configure (stored under site.apps):\n- googleAnalytics — GA4 Measurement ID \"G-XXXXXXXXXX\" (G- + 10 chars), e.g. \"G-AB12CD34EF\"\n- gtm — Google Tag Manager container \"GTM-XXXXXXX\"\n- facebookPixel — numeric Pixel ID\n- twitterPixel — lowercase alphanumeric Pixel ID (min 5 chars)\n- appsFlyer — dev key UUID (8-4-4-4-12)\n- adjust — 12-char alphanumeric app token\n- singular — JSON string: { sdkKey, sdkSecret, bundleId }"
+      },
+      "value": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Connector ID/token in the exact format required for `type` (e.g. \"G-AB12CD34EF\" for googleAnalytics). The server validates the format and returns HTTP 400 on mismatch."
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "type",
+      "value"
+    ]
+  },
+  "create_ai_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "siteId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site _id (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      },
+      "componentCode": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Main block JSX (required). GLOBALS — DO NOT import, they are injected automatically (importing causes \"symbol already declared\"): useControls, text, color, toggle, number, select, localizedText, AutoControls. MUST IMPORT explicitly (NOT globals): import { TextEditor } from '@site-builder/block-utils'; — required for every canvas text field; missing this import = ReferenceError at runtime. Component signature: export default function MyBlock() {} — no props, no ({ localizedText })."
+      },
+      "settingsCode": {
+        "description": "Settings panel JSX (optional). With Magic Controls: export default () => <AutoControls />;. AutoControls is a global — do NOT import it. Omit only if the block has no editable fields.",
+        "type": "string"
+      },
+      "defaultData": {
+        "description": "Initial internalBlockValues (optional)",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "name": {
+        "description": "Human-readable block name shown in the editor (optional). If omitted, derived from the component function name.",
+        "type": "string"
+      },
+      "textFields": {
+        "description": "Canvas-editable text fields. Required for every visible text in the block (headings, body, buttons, CTAs). Each entry creates a localizedText() binding used with <TextEditor id={localizedText(\"name\")} /> in componentCode.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^\\w+$",
+              "description": "Stable identifier for the text field (e.g. \"title\", \"cta\")"
+            },
+            "default": {
+              "type": "string",
+              "description": "Default text value for this field"
+            }
+          },
+          "required": [
+            "name",
+            "default"
+          ]
+        }
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "siteId",
+      "domain",
+      "pageId",
+      "componentCode"
+    ]
+  },
+  "create_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      },
+      "module": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block module name (e.g., \"hero\", \"store\", \"faq\", \"header\", \"gallery\")"
+      },
+      "version": {
+        "description": "Block version. REQUIRED — always pass the maxVersion returned by get_block_schema. Using an outdated version creates blocks with the wrong structure.",
+        "type": "number"
+      },
+      "position": {
+        "description": "Zero-based index where the block should be inserted in the page (optional). Omit or pass undefined to append at the end. E.g. position: 0 inserts at the top, position: 4 makes the block 5th.",
+        "type": "number"
+      },
+      "blockValues": {
+        "description": "Override default block values (optional). Must be { values: {...}, components?: [...] }. Localized fields: { \"__type\": \"localized-value-descriptor\", \"enable\": true, \"tag\": \"hint\", \"localizedString\": { \"en-US\": \"text\" } }",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId",
+      "module"
+    ]
+  },
+  "create_page": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "description": "Page title shown in the editor (required, max 80 chars)"
+      },
+      "path": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page route, lowercase only — letters (a-z), digits (0-9), hyphen and slash, no trailing slash (e.g. \"/news\"). \"/\" is reserved for the main page (required)."
+      },
+      "type": {
+        "description": "Seed the page from a site-template key (SiteTemplate.key). Choose this OR \"createFromSite\", not both. Call \"list_site_templates\" to discover valid keys; the server rejects unknown ones. Omit both to fall back to the default game-sales page.",
+        "type": "string"
+      },
+      "parsingUrl": {
+        "description": "Sub-option of \"type\": storefront URL to seed content from. Requires \"type\", and only valid when that SiteTemplate has a truthy \"parsingSupport\" field (see \"list_site_templates\"; e.g. \"sellingpage\" → Steam/Epic, \"topup\"). Omit otherwise.",
+        "type": "string",
+        "format": "uri"
+      },
+      "createFromSite": {
+        "description": "Seed the page by cloning an existing site instead of a template. Choose this OR \"type\", not both. Source site _id (MongoId); copies that site's main page ('/') and its blocks.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "name",
+      "path"
+    ]
+  },
+  "create_sidebar": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockValues": {
+        "description": "Optional override for sidebar values. Structure: { values: { title, developer, logo, socials, ... } }. Localized fields use LocalizedValueDescriptor format.",
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "create_site": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required). Must be provided by the user — do not infer or reuse."
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required). Must be provided by the user — do not infer or reuse."
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the new site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required). Must be provided by the user — do not auto-generate."
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "topup",
+          "sellingpage",
+          "store"
+        ],
+        "description": "topup (mobile top-up webshop), sellingpage (single PC/Steam game landing), or store (multi-game storefront). Infer from product; ask only if ambiguous."
+      },
+      "target": {
+        "description": "Storefront URL to seed content. STRICT: topup → apps.apple.com / play.google.com only; sellingpage → store.steampowered.com only; omit for store. Mismatch → switch type or clarify, do not pass through.",
+        "type": "string"
+      },
+      "emptyBlock": {
+        "default": false,
+        "description": "Do NOT ask. true only if user signals custom initial layout (start blank / design own blocks); else false to keep template blocks.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "type"
+    ]
+  },
+  "delete_ai_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ID of the AI block to delete (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "blockId"
+    ]
+  },
+  "delete_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block _id to delete (required)"
+      },
+      "confirmed": {
+        "description": "Set to true to confirm deletion (fallback when elicitation is not supported by the client).",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "blockId"
+    ]
+  },
+  "delete_page": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId"
+    ]
+  },
+  "disconnect_integration": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "gtm",
+          "googleAnalytics",
+          "facebookPixel",
+          "twitterPixel",
+          "appsFlyer",
+          "adjust",
+          "singular"
+        ],
+        "description": "Connector to configure (stored under site.apps):\n- googleAnalytics — GA4 Measurement ID \"G-XXXXXXXXXX\" (G- + 10 chars), e.g. \"G-AB12CD34EF\"\n- gtm — Google Tag Manager container \"GTM-XXXXXXX\"\n- facebookPixel — numeric Pixel ID\n- twitterPixel — lowercase alphanumeric Pixel ID (min 5 chars)\n- appsFlyer — dev key UUID (8-4-4-4-12)\n- adjust — 12-char alphanumeric app token\n- singular — JSON string: { sdkKey, sdkSecret, bundleId }"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "type"
+    ]
+  },
+  "duplicate_page": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId"
+    ]
+  },
+  "get_ai_block_source": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ID of the FederatedBlock (returned by create_ai_block)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "blockId"
+    ]
+  },
+  "get_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block _id (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "blockId"
+    ]
+  },
+  "get_block_schema": {
+    "type": "object",
+    "properties": {
+      "module": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block module name (e.g., \"gallery\", \"hero\", \"sb-offer-chain\")"
+      }
+    },
+    "required": [
+      "module"
+    ]
+  },
+  "get_block_translations": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block _id (required)"
+      },
+      "locales": {
+        "description": "Locale codes to include (e.g. [\"en-US\", \"ru-RU\"]). Omit to return all locales.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "filter": {
+        "description": "Optional field name prefix to narrow results (e.g. \"title\" returns only the block title, \"discord_\" returns all Discord quest fields).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "blockId"
+    ]
+  },
+  "get_daily_reward": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "locale": {
+        "description": "Locale code (e.g. \"en\", \"ru\"). Defaults to \"en\".",
+        "type": "string"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId"
+    ]
+  },
+  "get_launcher_list": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "get_offer_chains": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "locale": {
+        "description": "Locale code (e.g. \"en\", \"ru\"). Defaults to \"en\".",
+        "type": "string"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId"
+    ]
+  },
+  "get_page": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId"
+    ]
+  },
+  "get_page_seo": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId"
+    ]
+  },
+  "get_rendered_block_html": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "description": "Page _id (optional, omit for site-level blocks)",
+        "type": "string"
+      },
+      "blockId": {
+        "description": "Optional block _id. When provided, narrows the scope to that block region and reports whether it was found.",
+        "type": "string"
+      },
+      "classFilter": {
+        "description": "Optional case-insensitive substring to keep only matching class names (e.g. \"store\", \"card\", \"price\").",
+        "type": "string"
+      },
+      "locale": {
+        "description": "Locale code (e.g. \"en\", \"ru\"). Defaults to \"en\".",
+        "type": "string"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "get_site": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "get_store_data": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "knowledge_get_block_utils_hooks": {
+    "type": "object",
+    "properties": {
+      "category": {
+        "description": "Which hook category to return full signatures for. Omit to get the index of all categories, then call again with a category to drill in.",
+        "type": "string",
+        "enum": [
+          "data",
+          "auth",
+          "i18n",
+          "analytics",
+          "cart",
+          "rewards",
+          "purchase",
+          "store",
+          "wallet",
+          "promocode",
+          "unclaimed",
+          "navigation",
+          "editorState",
+          "misc"
+        ]
+      }
+    }
+  },
+  "knowledge_get_blocks": {
+    "type": "object",
+    "properties": {
+      "category": {
+        "description": "Optional filter to one editability category. Omit to get the full catalog.",
+        "type": "string",
+        "enum": [
+          "content",
+          "data-bound",
+          "structural",
+          "custom-code"
+        ]
+      }
+    }
+  },
+  "knowledge_get_login_methods": {
+    "type": "object",
+    "properties": {}
+  },
+  "knowledge_get_template_behavior": {
+    "type": "object",
+    "properties": {
+      "topic": {
+        "description": "Optional filter to a single topic. Omit to get all three (store, cart, login).",
+        "type": "string",
+        "enum": [
+          "store",
+          "cart",
+          "login"
+        ]
+      }
+    }
+  },
+  "list_block_modules": {
+    "type": "object",
+    "properties": {}
+  },
+  "list_blocks": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "description": "Page _id (optional, omit for site-level blocks)",
+        "type": "string"
+      },
+      "limit": {
+        "default": 50,
+        "description": "Max blocks to return (default: 50, max: 100)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "list_pages": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "includeDrafts": {
+        "default": true,
+        "description": "Include draft pages (default: true)",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "list_site_templates": {
+    "type": "object",
+    "properties": {
+      "tags": {
+        "description": "Filter templates by tag key (e.g. \"game_publishing\", \"web_shop\"). Omit to list all.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "list_sites": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "limit": {
+        "default": 10,
+        "description": "Max sites to return per page (required, 1–25). Start with 10.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 25
+      },
+      "offset": {
+        "default": 0,
+        "description": "Number of sites to skip (required). Start at 0; add limit each page to fetch the next.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId"
+    ]
+  },
+  "reorder_blocks": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      },
+      "blockOrder": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Full list of the page's block ids in the desired order. Must contain exactly the same ids the page currently has."
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId",
+      "blockOrder"
+    ]
+  },
+  "search_blocks": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "module": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block module name (e.g., \"hero\", \"store\")"
+      },
+      "limit": {
+        "default": 20,
+        "description": "Max results (default: 20, max: 100)",
+        "type": "number"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "module"
+    ]
+  },
+  "send_notification": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Toaster title (required, non-empty)"
+      },
+      "description": {
+        "description": "Toaster body text (optional)",
+        "type": "string"
+      },
+      "palette": {
+        "description": "Visual palette (optional, default chosen by client)",
+        "type": "string",
+        "enum": [
+          "success",
+          "warning",
+          "info",
+          "alert"
+        ]
+      },
+      "pageId": {
+        "description": "Restrict delivery to subscribers on this page (optional). Omit to broadcast to all subscribers on the landing.",
+        "type": "string"
+      },
+      "halt": {
+        "description": "Halt editor activity while the AI performs long-running work. Send `\"start\"` before the first mutating tool to freeze the editor. The freeze is not lifted automatically — send `\"end\"` exactly once when the whole task is complete (after the last mutating tool, not after each one).",
+        "type": "string",
+        "enum": [
+          "start",
+          "end"
+        ]
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "title"
+    ]
+  },
+  "update_ai_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ID of the AiBlock to update (required)"
+      },
+      "componentCode": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New main block JSX (required). GLOBALS — DO NOT import, they are injected automatically (importing causes \"symbol already declared\"): useControls, text, color, toggle, number, select, localizedText, AutoControls. MUST IMPORT explicitly (NOT globals): import { TextEditor } from '@site-builder/block-utils'; — required for every canvas text field; missing this import = ReferenceError at runtime. Component signature: export default function MyBlock() {} — no props, no ({ localizedText })."
+      },
+      "settingsCode": {
+        "description": "New settings panel JSX (optional). With Magic Controls: export default () => <AutoControls />;. AutoControls is a global — do NOT import it. Always pass settingsCode if the block had one — omitting it wipes the settings panel.",
+        "type": "string"
+      },
+      "defaultData": {
+        "description": "New internalBlockValues — omit to keep existing (optional)",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "name": {
+        "description": "New human-readable block name shown in the editor (optional). Omit to keep existing.",
+        "type": "string"
+      },
+      "textFields": {
+        "description": "Canvas-editable text fields. Pass ALL current field names from textRefs (get_ai_block_source) plus any new ones. Keep existing names stable to preserve user translations. Omit only if the block has no visible text.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^\\w+$",
+              "description": "Stable identifier for the text field (e.g. \"title\", \"cta\")"
+            },
+            "default": {
+              "type": "string",
+              "description": "Default text value for this field"
+            }
+          },
+          "required": [
+            "name",
+            "default"
+          ]
+        }
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "blockId",
+      "componentCode"
+    ]
+  },
+  "update_block": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "blockId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Block _id to update (required)"
+      },
+      "values": {
+        "description": "Partial block values to update. Keys are relative to block.values — do NOT include a leading \"values.\" prefix (unlike create_block which wraps everything in { values: {...} }). Examples: \"title\" patches block.values.title; \"internalBlockValues.chainSettings.stepsLayout\" patches that nested field. Keys support dot notation. Unspecified keys remain unchanged. Localized fields use LocalizedValueDescriptor format.\n\nLOCALIZED FIELDS — REPLACE, NOT MERGE: a localized field is patched as a whole object. The localizedString you pass REPLACES the entire existing one, so any locale you omit is LOST. To change one locale, you MUST include ALL existing locales (call get_block first to read them) and edit only the target — e.g. to translate the title to Russian, send localizedString with every current locale plus the new \"ru-RU\", not just { \"ru-RU\": \"...\" }. Pass PLAIN text per locale; the server re-wraps it using quillWrapper (do not include existing <h2>/<p> tags or you get double-wrapping).",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "components": {
+        "description": "Full components array replacement (e.g. gallery slides). Replaces all existing components.",
+        "type": "array",
+        "items": {}
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "blockId"
+    ]
+  },
+  "update_feature_toggles": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "enableLazyLoadStoreBlock": {
+        "description": "\"Lazy Load Store\" — defer loading of the store block.",
+        "type": "boolean"
+      },
+      "hideGdprConsent": {
+        "description": "\"Hide GDPR Consent\" — suppress the GDPR consent banner.",
+        "type": "boolean"
+      },
+      "enablePurchaseButtonWhenItemInCart": {
+        "description": "\"Enable Purchase Button When Item in Cart\" — keep the buy button active for items already in the cart.",
+        "type": "boolean"
+      },
+      "disableOptimisticStorePreload": {
+        "description": "\"Disable Optimistic Store Preload\" — turn off optimistic preloading of store data.",
+        "type": "boolean"
+      },
+      "enableSpaNavigation": {
+        "description": "\"Enable SPA Navigation\" — client-side single-page navigation.",
+        "type": "boolean"
+      },
+      "enableSpaCustomCode": {
+        "description": "\"Enable SPA custom code\" — run custom code under SPA navigation.",
+        "type": "boolean"
+      },
+      "disableUnclaimedIndicator": {
+        "description": "\"Disable Unclaimed Indicator for Unauthenticated Items\" — hide the unclaimed badge for unauthenticated users.",
+        "type": "boolean"
+      },
+      "isIndependentWindowsForIosMobile": {
+        "description": "\"Is Independent Windows For IOS Mobile\" — open independent windows on iOS mobile.",
+        "type": "boolean"
+      },
+      "enableExpandedIosLandscapeSafeArea": {
+        "description": "\"Enable Expanded iOS Landscape Safe Area\" — expand the safe area in iOS landscape.",
+        "type": "boolean"
+      },
+      "disableSendSteamIdToStore": {
+        "description": "\"Disable Send Steam ID to Store API\" — stop forwarding the Steam ID to the Store API.",
+        "type": "boolean"
+      },
+      "hideBuyButtonSelector": {
+        "description": "\"Hide Buy Button selector in all Store sections\" — true hides it (stored as hideBuyButtonSelectorGlobalState=\"on\"), false shows it (\"off\").",
+        "type": "boolean"
+      },
+      "showRewardsBalanceInHeader": {
+        "description": "\"Show reward balance in header\" — toggle the rewards balance display in the header.",
+        "type": "boolean"
+      },
+      "showZeroRewardsBalance": {
+        "description": "Show the rewards balance even when it is zero. Only meaningful alongside showRewardsBalanceInHeader; the existing value is preserved if omitted.",
+        "type": "boolean"
+      },
+      "storePreloadLimit": {
+        "description": "\"Limit store preload requests\" — number of preload requests (0-10). Pass null to remove the limit (toggle off).",
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain"
+    ]
+  },
+  "update_localization": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "localizationId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Localization DB key including \"L:\" prefix (e.g. \"L:178e740e-c0d0-4133-90a2-f4ccbf18718c\"). For federated blocks: use the localizationId field returned by get_block_translations (NOT the short resourceKey)."
+      },
+      "locale": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Target locale, 5 chars (e.g. \"en-US\", \"ru-RU\")"
+      },
+      "value": {
+        "type": "string",
+        "description": "Translated text"
+      },
+      "pageId": {
+        "description": "Page _id for page-scoped localization. Omit for common (site-level) localization.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "localizationId",
+      "locale",
+      "value"
+    ]
+  },
+  "update_page": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      },
+      "name": {
+        "description": "New page title (max 80 chars).",
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80
+      },
+      "path": {
+        "description": "New page route, lowercase only (a-z, 0-9, hyphen, slash), no trailing slash. If another page already owns this path, the two pages swap paths (used for reordering).",
+        "type": "string",
+        "minLength": 1
+      },
+      "draft": {
+        "description": "Publish state: true keeps the page as a draft, false publishes it.",
+        "type": "boolean"
+      },
+      "type": {
+        "description": "Reinitialize the page from a site-template key (see \"list_site_templates\"). Only allowed when the page is currently of type \"empty\"; the server rejects re-initializing a non-empty page or passing \"empty\" here.",
+        "type": "string"
+      },
+      "parsingUrl": {
+        "description": "Storefront URL to seed content from when reinitializing via \"type\". Only valid for templates with parsingSupport.",
+        "type": "string",
+        "format": "uri"
+      },
+      "theme": {
+        "description": "Per-page theme override (colors, fonts, radius, blur). Setting it enables the page-level theme; omitted fields inherit the current page theme, or the site theme if the page has none. To restyle ALL pages instead, use \"update_theme\".",
+        "type": "object",
+        "properties": {
+          "primary": {
+            "description": "Primary accent/brand color — buttons, links, highlights",
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "description": "Main body text color",
+            "type": "string",
+            "minLength": 1
+          },
+          "secondary": {
+            "description": "Secondary surface color",
+            "type": "string",
+            "minLength": 1
+          },
+          "border": {
+            "description": "Border/divider color",
+            "type": "string",
+            "minLength": 1
+          },
+          "overlay": {
+            "description": "Overlay/backdrop color",
+            "type": "string",
+            "minLength": 1
+          },
+          "background": {
+            "description": "Page background tint (theme.pictureBackground.color).",
+            "type": "string",
+            "minLength": 1
+          },
+          "buttonBorderRadius": {
+            "description": "Button corner radius in px.",
+            "type": "number",
+            "minimum": 0
+          },
+          "backgroundBlur": {
+            "description": "Background blur amount.",
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId"
+    ]
+  },
+  "update_page_seo": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "pageId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Page _id (required)"
+      },
+      "locale": {
+        "description": "Locale for the localized text fields (title, description, ogImage), e.g. \"en-US\", \"ru-RU\". Defaults to \"en-US\". One call writes ONE locale — call again per locale to translate.",
+        "type": "string"
+      },
+      "title": {
+        "description": "SEO / OpenGraph title for the given locale — the <title>, og:title and Google result heading. Updates the text for that locale only.",
+        "type": "string"
+      },
+      "description": {
+        "description": "SEO / OpenGraph meta description for the given locale — the meta description and og:description. Updates the text for that locale only.",
+        "type": "string"
+      },
+      "ogImage": {
+        "description": "OpenGraph share image URL (og:image) for the given locale. Recommended 1200x630. Must be an absolute URL.",
+        "type": "string",
+        "format": "uri"
+      },
+      "indexable": {
+        "description": "Search-engine indexing. true = indexable; false emits <meta name=\"robots\" content=\"noindex, nofollow\"> so the page is hidden from search engines.",
+        "type": "boolean"
+      },
+      "canonicalUrl": {
+        "description": "Canonical URL for the page (<link rel=\"canonical\">). Absolute URL, or an empty string (\"\") to clear it.",
+        "type": "string"
+      },
+      "customHeadHTML": {
+        "description": "Raw HTML injected into <head> (extra meta tags, verification snippets, structured data). Replaces the existing value entirely; pass \"\" to clear.",
+        "type": "string"
+      },
+      "manifestEnable": {
+        "description": "Enable the PWA web manifest for this page.",
+        "type": "boolean"
+      },
+      "manifestIcon192": {
+        "description": "PWA manifest icon URL, 192x192. Absolute URL.",
+        "type": "string",
+        "format": "uri"
+      },
+      "manifestIcon512": {
+        "description": "PWA manifest icon URL, 512x512. Absolute URL.",
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "pageId"
+    ]
+  },
+  "update_seo_favicon": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "favicon": {
+        "type": "string",
+        "format": "uri",
+        "description": "Favicon URL for the whole site (<link rel=\"icon\">). Site-level, applies to every page. Absolute URL (required)."
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "favicon"
+    ]
+  },
+  "update_theme": {
+    "type": "object",
+    "properties": {
+      "merchantId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Merchant ID (required)"
+      },
+      "projectId": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Project ID (required)"
+      },
+      "domain": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Site Domain — the site identifier/slug (e.g. \"sb-xxxx-site\"), not a network hostname (required)"
+      },
+      "theme": {
+        "type": "object",
+        "properties": {
+          "primary": {
+            "description": "Primary accent/brand color — buttons, links, highlights",
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "description": "Main body text color",
+            "type": "string",
+            "minLength": 1
+          },
+          "secondary": {
+            "description": "Secondary surface color",
+            "type": "string",
+            "minLength": 1
+          },
+          "border": {
+            "description": "Border/divider color",
+            "type": "string",
+            "minLength": 1
+          },
+          "overlay": {
+            "description": "Overlay/backdrop color",
+            "type": "string",
+            "minLength": 1
+          },
+          "background": {
+            "description": "Page background tint (theme.pictureBackground.color).",
+            "type": "string",
+            "minLength": 1
+          },
+          "buttonBorderRadius": {
+            "description": "Button corner radius in px.",
+            "type": "number",
+            "minimum": 0
+          },
+          "backgroundBlur": {
+            "description": "Background blur amount.",
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "description": "Site-wide theme changes. Applies to every page that has not set its own per-page override. Provide at least one field."
+      }
+    },
+    "required": [
+      "merchantId",
+      "projectId",
+      "domain",
+      "theme"
+    ]
+  },
+  "validate_ai_block_code": {
+    "type": "object",
+    "properties": {
+      "componentCode": {
+        "type": "string",
+        "minLength": 1,
+        "description": "componentCode to validate before calling create_ai_block or update_ai_block"
+      },
+      "settingsCode": {
+        "description": "settingsCode to validate (optional)",
+        "type": "string"
+      },
+      "textFields": {
+        "description": "textFields array — used to verify every localizedText() call has a matching declaration",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^\\w+$",
+              "description": "Stable identifier for the text field (e.g. \"title\", \"cta\")"
+            },
+            "default": {
+              "type": "string",
+              "description": "Default text value for this field"
+            }
+          },
+          "required": [
+            "name",
+            "default"
+          ]
+        }
+      }
+    },
+    "required": [
+      "componentCode"
+    ]
+  }
+}

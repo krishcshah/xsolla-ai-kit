@@ -30,6 +30,25 @@ jobs:
       - name: Validate skills, registries, links and provider sync
         run: python3 .github/scripts/validate_skills.py
 
+  scripts:
+    name: Skill helper scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+        with:
+          persist-credentials: false
+
+      # The runner's preinstalled Node is used deliberately: scripts/ ships zero
+      # dependencies and must keep working on a plain Node >= 18, so pulling in
+      # setup-node would test a version this repo does not require.
+      - name: Node version
+        run: node --version
+
+      - name: Unit tests
+        working-directory: scripts/site-builder
+        run: node --test
+
   workflow-permissions:
     name: Workflows declare least-privilege permissions
     runs-on: ubuntu-latest

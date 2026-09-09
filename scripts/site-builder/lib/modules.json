@@ -1,0 +1,165 @@
+{
+  "_note": "Snapshot of @site-builder/common block metadata. Regenerate when the block catalog changes; there is no runtime source for it here.",
+  "_generatedFrom": "packages/common/src/types/site/block/common/block-module.ts + blocks-metadata.ts",
+  "layoutModules": [
+    "header",
+    "common-layout",
+    "side-by-side-layout"
+  ],
+  "uncreatableModules": [
+    "header",
+    "common-layout",
+    "side-by-side-layout",
+    "sidebar",
+    "federated",
+    "store"
+  ],
+  "federatedModules": [
+    "sb-offer-chain",
+    "sb-daily-reward",
+    "social-quests",
+    "offerwall-block"
+  ],
+  "nativeModules": {
+    "description": {
+      "maxVersion": 2,
+      "uiName": "Description",
+      "creatable": true
+    },
+    "faq": {
+      "maxVersion": 2,
+      "uiName": "FAQs",
+      "creatable": true
+    },
+    "fast-login": {
+      "maxVersion": null,
+      "uiName": "Fast Login",
+      "creatable": true
+    },
+    "footer": {
+      "maxVersion": 3,
+      "uiName": "Footer",
+      "creatable": true
+    },
+    "gallery": {
+      "maxVersion": 2,
+      "uiName": "Gallery",
+      "creatable": true
+    },
+    "header": {
+      "maxVersion": 3,
+      "uiName": "Header",
+      "creatable": false
+    },
+    "hero": {
+      "maxVersion": null,
+      "uiName": "Call-to-action",
+      "creatable": true
+    },
+    "html": {
+      "maxVersion": 2,
+      "uiName": "Custom code",
+      "creatable": true
+    },
+    "lead": {
+      "maxVersion": null,
+      "uiName": "Lead block",
+      "creatable": true
+    },
+    "leadGameSales": {
+      "maxVersion": null,
+      "uiName": "Lead block",
+      "creatable": true
+    },
+    "newStore": {
+      "maxVersion": null,
+      "uiName": "Store",
+      "creatable": true
+    },
+    "news": {
+      "maxVersion": 2,
+      "uiName": "News",
+      "creatable": true
+    },
+    "nft": {
+      "maxVersion": null,
+      "uiName": "NFT store",
+      "creatable": true
+    },
+    "packs": {
+      "maxVersion": 2,
+      "uiName": "Game packs",
+      "creatable": true
+    },
+    "promoSlider": {
+      "maxVersion": null,
+      "uiName": "Promo slider",
+      "creatable": true
+    },
+    "promocodes": {
+      "maxVersion": 2,
+      "uiName": "Promo codes",
+      "creatable": true
+    },
+    "requirements": {
+      "maxVersion": 2,
+      "uiName": "System requirements",
+      "creatable": true
+    },
+    "retailers": {
+      "maxVersion": null,
+      "uiName": "Sellers block",
+      "creatable": true
+    },
+    "rewards": {
+      "maxVersion": null,
+      "uiName": "Reward system",
+      "creatable": true
+    },
+    "embed": {
+      "maxVersion": null,
+      "uiName": "Social media widgets",
+      "creatable": true
+    },
+    "subscriptions-packs": {
+      "maxVersion": null,
+      "uiName": "Subscriptions",
+      "creatable": true
+    },
+    "store": {
+      "maxVersion": null,
+      "uiName": "store",
+      "creatable": false
+    },
+    "bento-grid": {
+      "maxVersion": null,
+      "uiName": "Card grid",
+      "creatable": true
+    },
+    "payment-methods": {
+      "maxVersion": null,
+      "uiName": "Payment methods",
+      "creatable": true
+    },
+    "federated": {
+      "maxVersion": null,
+      "uiName": "federated",
+      "creatable": false
+    },
+    "common-layout": {
+      "maxVersion": null,
+      "uiName": "common-layout",
+      "creatable": false
+    },
+    "side-by-side-layout": {
+      "maxVersion": null,
+      "uiName": "side-by-side-layout",
+      "creatable": false
+    },
+    "sidebar": {
+      "maxVersion": null,
+      "uiName": "Sidebar",
+      "creatable": false
+    }
+  }
+}

@@ -4,3 +4,12 @@
 .env
 
 .idea/
+
+# Extraction notes for the Site Builder port: an internal engineering record
+# (stage/dev hostnames, internal ticket ids, raw endpoint traces). The port
+# itself is public; these working notes are not.
+docs/site-builder-mcp/
+
+# Local CLI environment config: real merchant/project ids and internal
+# dev/stage hostnames. Every developer's is different; none belong in git.
+.xsolla.json

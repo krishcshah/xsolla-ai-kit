@@ -1,0 +1,72 @@
+{
+  "resources": {
+    "localizedValues": {
+      "L:l9mk8v3ixxe": {
+        "texts": {
+          "__type": "localized-value-descriptor",
+          "localizedString": {
+            "en-US": "Gallery"
+          },
+          "enable": true,
+          "tag": "block.title"
+        }
+      },
+      "L:d0tv64x7a": {
+        "texts": {
+          "__type": "localized-value-descriptor",
+          "localizedString": {
+            "en-US": "Add game shots, illustrations or videos that provide your players with a glimpse into the game world to boost their interest to make a purchase. Display images of character designs, scenic landscapes, and magical creatures to attract players' attention."
+          },
+          "enable": true,
+          "tag": "block.description"
+        }
+      }
+    },
+    "mediaValues": {
+      "I:t22j2om3v9t": {
+        "size": "cover",
+        "src": "https://cdn.xsolla.net/merchant-bucket-prod/files/uploaded/71070/166ac93ded85dd1728b308d808ceaeee.png",
+        "color": "transparent",
+        "gradient": "linear-gradient(0deg, rgba(0, 0, 0, 0) 0.00%, rgba(0, 0, 0, 0) 100.00%)"
+      },
+      "I:bqkimsyebff": {
+        "size": "cover",
+        "src": "https://cdn.xsolla.net/merchant-bucket-prod/files/uploaded/71070/166ac93ded85dd1728b308d808ceaeee.png",
+        "color": "transparent",
+        "gradient": "linear-gradient(0deg, rgba(0, 0, 0, 0) 0.00%, rgba(0, 0, 0, 0) 100.00%)"
+      },
+      "I:kp3ijiivvod": {
+        "size": "cover",
+        "src": "https://cdn.xsolla.net/merchant-bucket-prod/files/uploaded/71070/166ac93ded85dd1728b308d808ceaeee.png",
+        "color": "transparent",
+        "gradient": "linear-gradient(0deg, rgba(0, 0, 0, 0) 0.00%, rgba(0, 0, 0, 0) 100.00%)"
+      }
+    }
+  },
+  "defaultData": {
+    "translations": {
+      "block.title": "L:l9mk8v3ixxe",
+      "block.description": "L:d0tv64x7a"
+    },
+    "showTitle": true,
+    "showDescription": true,
+    "slides": {
+      "ids": [
+        "0",
+        "1",
+        "2"
+      ],
+      "entities": {
+        "0": {
+          "image": "I:t22j2om3v9t"
+        },
+        "1": {
+          "image": "I:bqkimsyebff"
+        },
+        "2": {
+          "image": "I:kp3ijiivvod"
+        }
+      }
+    }
+  }
+}

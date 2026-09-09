@@ -24,6 +24,10 @@ Skills call **Xsolla REST APIs directly**. The CLI (`xsolla/xsolla-cli`) is an o
 | `headless-checkout-integration` | Payments via Headless Checkout                                                           |
 | `webhooks-impl`                 | Generates webhook handler code for order/payment events                                  |
 | `production`                    | Sandbox → live: contract, flip flags, deploy, developer live-payment checklist           |
+| `site-builder-pages`            | Site Builder sites, pages and themes — the ids every other Site Builder command needs    |
+| `site-builder-blocks`           | Site Builder page content: add, edit, inspect and delete blocks; read translations       |
+| `shop-translation`              | Translates a whole shop — catalog items and Site Builder storefront — into new languages |
+| `steam-storefront`              | Generates a whole storefront from a Steam/Google Play store listing                      |
 
 ---
 
@@ -43,6 +47,18 @@ Integrate payments into my game
 
 Go live / leave sandbox
 → triggers: production
+
+Add a page to my Site Builder site / change the site colors
+→ triggers: site-builder-pages
+
+Add a gallery block to that page / update the hero image
+→ triggers: site-builder-blocks
+
+Translate my shop into Japanese / localize the store
+→ triggers: shop-translation
+
+Build a site for this Steam game / import this Steam link
+→ triggers: steam-storefront
 ```
 
 ---
@@ -56,6 +72,12 @@ XSOLLA_PROJECT_API_KEY=<your API key>
 ```
 Setup by `merchant-setup` skill.
 
+Site Builder skills use a separate credential:
+
+```bash
+SB_TOKEN=<Site Builder editor token>
+```
+
 ---
 
 ## Key directories
@@ -67,6 +89,7 @@ Setup by `merchant-setup` skill.
 | `docs/` | Architecture, distribution, and skill-gap guides. |
 | `.cursor/skills/` | Cursor-native skills (synced copy of `skills/`; do not edit manually) |
 | `.cursor/rules/` | Short always-on Cursor pointer rule |
+| `scripts/site-builder/` | Zero-dependency Node commands the `site-builder-*` skills invoke (`sb.mjs`) |
 
 ---
 

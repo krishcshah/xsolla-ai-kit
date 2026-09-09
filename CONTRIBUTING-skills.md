@@ -17,7 +17,11 @@ This is the Xsolla guide for writing agent skills for `xsolla/xsolla-ai-kit`.
 4. **Pushy description** — cover every trigger scenario; agents use this to decide when
    to invoke. Keep it under **1,536 characters**: Claude Code truncates the skill listing
    at that point, so trailing trigger keywords are silently dropped. Key use case first.
-5. **No raw `curl` commands** — describe intent + Xsolla API endpoint, not raw HTTP
+5. **No raw `curl` commands** — describe intent + Xsolla API endpoint, not raw HTTP.
+   If a workflow genuinely cannot be expressed as intent — a payload whose construction is
+   non-obvious enough that a described version would be got wrong — put it in a script under
+   `scripts/<area>/` and have the skill invoke that. `site-builder-*` is the precedent.
+   Scripts ship zero dependencies and are covered by `node --test` in CI.
 6. **PR must include agent test** — exact prompt you used + one-line result
 7. **Update both registries** — add a row to `skills/README.md` and an entry plus a
    trigger line to `AGENTS.md`, or agents can't discover the skill

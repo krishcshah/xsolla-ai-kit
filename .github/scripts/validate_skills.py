@@ -39,6 +39,7 @@ VALID_OWNERS = {
     "p.sanachev",
     "elnur_khalilov",
     "e.chernykh",
+    "a.springut",
 }
 
 VALID_DOMAINS = {
@@ -50,6 +51,7 @@ VALID_DOMAINS = {
     "design",
     "orchestrator",
     "go-live",
+    "site-builder",
 }
 
 errors: list[str] = []
@@ -217,6 +219,35 @@ def check_generated_files(skill_names: list[str]) -> None:
                 error(f".cursor/skills/{name}/{src.relative_to(SKILLS / name)} differs from its source — run the provider sync")
 
 
+# Skills may invoke a repo script. The path is written for the agent's runtime
+# (`${CLAUDE_PLUGIN_ROOT:-.}/...`), so a plain link check cannot see it — but a
+# skill pointing at a script that has been moved or renamed fails at the exact
+# moment an agent tries to use it, with nothing in CI to warn anyone.
+SCRIPT_INVOCATION = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT:-\.\}/(\S+?\.mjs)")
+
+
+def check_script_references() -> None:
+    for md in SKILLS.rglob("*.md"):
+        text = md.read_text(encoding="utf-8")
+        for target in set(SCRIPT_INVOCATION.findall(text)):
+            if not (ROOT / target).is_file():
+                error(
+                    f"{md.relative_to(ROOT)}: invokes '{target}', which does not exist "
+                    f"— the script moved, or the path is wrong"
+                )
+
+
+def check_scripts() -> None:
+    """Executable skill helpers must at least parse."""
+    scripts = sorted((ROOT / "scripts").rglob("*.mjs")) if (ROOT / "scripts").is_dir() else []
+    for script in scripts:
+        result = subprocess.run(
+            ["node", "--check", str(script)], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            error(f"{script.relative_to(ROOT)}: syntax error — {result.stderr.strip().splitlines()[0]}")
+
+
 def check_secrets() -> None:
     """Catch credentials pasted into docs before they reach a public branch."""
     patterns = [
@@ -254,6 +285,8 @@ def main() -> int:
         check_skill(SKILLS / name)
 
     check_links()
+    check_script_references()
+    check_scripts()
     check_json()
     check_registries(skill_names)
     check_generated_files(skill_names)
