@@ -47,14 +47,21 @@ def summarize(runs: list[dict]) -> dict:
         if run.get("result") not in RESULTS:
             errors.append(f"run {index}: result must be success or failure")
         interventions = run.get("manual_interventions")
-        if not isinstance(interventions, int) or interventions < 0:
-            errors.append(f"run {index}: manual_interventions must be a non-negative integer")
+        if (
+            isinstance(interventions, bool)
+            or not isinstance(interventions, int)
+            or interventions < 0
+        ):
+            errors.append(
+                f"run {index}: manual_interventions must be a non-negative integer"
+            )
         if run.get("result") == "failure" and not run.get("failure"):
             errors.append(f"run {index}: failure details are required for a failed run")
 
     successes = sum(run.get("result") == "success" for run in runs)
     over_target = sum(
         isinstance(run.get("manual_interventions"), int)
+        and not isinstance(run.get("manual_interventions"), bool)
         and run["manual_interventions"] > 2
         for run in runs
     )

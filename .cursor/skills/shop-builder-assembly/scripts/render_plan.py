@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import sys
@@ -13,17 +14,52 @@ from validate_shop_brief import load_brief, validate
 
 PRESET_PAGES = {
     "mobile-single-page": [
-        {"name": "Home", "path": "/", "blocks": ["header", "leadGameSales", "newStore", "faq", "footer"]}
+        {
+            "name": "Home",
+            "path": "/",
+            "blocks": ["header", "leadGameSales", "newStore", "faq", "footer"],
+        }
     ],
     "pc-multi-page": [
-        {"name": "Home", "path": "/", "blocks": ["header", "leadGameSales", "description", "gallery", "footer"]},
-        {"name": "Store", "path": "/store", "blocks": ["header", "newStore", "faq", "footer"]},
-        {"name": "About", "path": "/about", "blocks": ["header", "description", "requirements", "faq", "footer"]},
+        {
+            "name": "Home",
+            "path": "/",
+            "blocks": ["header", "leadGameSales", "description", "gallery", "footer"],
+        },
+        {
+            "name": "Store",
+            "path": "/store",
+            "blocks": ["header", "newStore", "faq", "footer"],
+        },
+        {
+            "name": "About",
+            "path": "/about",
+            "blocks": ["header", "description", "requirements", "faq", "footer"],
+        },
     ],
     "live-service-events": [
-        {"name": "Home", "path": "/", "blocks": ["header", "leadGameSales", "newStore", "gallery", "faq", "footer"]},
-        {"name": "Store", "path": "/store", "blocks": ["header", "newStore", "faq", "footer"]},
-        {"name": "Events", "path": "/events", "blocks": ["header", "leadGameSales", "newStore", "description", "footer"]},
+        {
+            "name": "Home",
+            "path": "/",
+            "blocks": [
+                "header",
+                "leadGameSales",
+                "newStore",
+                "gallery",
+                "faq",
+                "footer",
+            ],
+        },
+        {
+            "name": "Store",
+            "path": "/store",
+            "blocks": ["header", "newStore", "faq", "footer"],
+        },
+        {
+            "name": "Events",
+            "path": "/events",
+            "blocks": ["header", "leadGameSales", "newStore", "description", "footer"],
+        },
     ],
 }
 
@@ -40,17 +76,159 @@ def choose_preset(brief: dict) -> str:
     return "mobile-single-page"
 
 
-def build_plan(brief: dict) -> dict:
+def canonical_hash(value: object) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def structure_data(value: object) -> dict:
+    if isinstance(value, dict) and value.get("ok") is True and "data" in value:
+        value = value["data"]
+    if not isinstance(value, dict):
+        raise ValueError("structure must contain an object")
+    return value
+
+
+def selected_pages(brief: dict, preset: str) -> list[dict]:
+    overrides = brief.get("content", {}).get("page_overrides")
+    return copy.deepcopy(overrides if overrides is not None else PRESET_PAGES[preset])
+
+
+def missing_data_reason(module: str, brief: dict) -> str | None:
+    content = brief.get("content", {})
+    catalog = brief["catalog"]
+    if module == "newStore" and not catalog["groups"]:
+        return "no catalog groups supplied"
+    if module == "gallery" and not (content.get("gallery") or content.get("media")):
+        return "no approved gallery media supplied"
+    if module == "requirements" and not content.get("requirements"):
+        return "no approved platform requirements supplied"
+    if module == "faq" and not content.get("faq"):
+        return "no approved FAQ supplied"
+    if module == "description" and not (
+        content.get("description") or content.get("events")
+    ):
+        return "no approved descriptive or event copy supplied"
+    if module == "bento-grid" and not content.get("features"):
+        return "no approved feature cards supplied"
+    if module == "packs" and not (catalog["groups"] or catalog.get("featured_skus")):
+        return "no catalog groups or featured SKUs supplied"
+    return None
+
+
+def omit_unwritable_blocks(
+    pages: list[dict], brief: dict
+) -> tuple[list[dict], list[dict]]:
+    omissions: list[dict] = []
+    for page in pages:
+        kept: list[str] = []
+        for module in page["blocks"]:
+            reason = missing_data_reason(module, brief)
+            if reason is None:
+                kept.append(module)
+            else:
+                omissions.append(
+                    {"path": page["path"], "module": module, "reason": reason}
+                )
+        page["blocks"] = kept
+    return pages, omissions
+
+
+def bind_current_state(pages: list[dict], structure: object | None) -> dict:
+    if structure is None:
+        for page in pages:
+            page["current_blocks"] = []
+            page["removals"] = []
+        return {
+            "status": "not-supplied",
+            "application_mode": "bootstrap-only",
+            "structure_sha256": None,
+            "extra_pages": [],
+        }
+
+    current = structure_data(structure)
+    current_pages = current.get("pages")
+    if not isinstance(current_pages, list):
+        raise ValueError("structure.pages must be a list")
+    planned_paths = {page["path"] for page in pages}
+    extra_pages = []
+    by_path = {}
+    for page in current_pages:
+        if not isinstance(page, dict) or not isinstance(page.get("path"), str):
+            raise ValueError("every current page must be an object with a path")
+        if page["path"] in by_path:
+            raise ValueError(
+                f"current structure contains duplicate path {page['path']}"
+            )
+        by_path[page["path"]] = page
+        if page["path"] not in planned_paths:
+            extra_pages.append(
+                {
+                    "page_id": page.get("_id"),
+                    "name": page.get("name"),
+                    "path": page["path"],
+                }
+            )
+
+    for page_plan in pages:
+        page_plan["current_blocks"] = []
+        page_plan["removals"] = []
+        current_page = by_path.get(page_plan["path"])
+        if current_page is None:
+            continue
+        blocks = current_page.get("blocks", [])
+        if not isinstance(blocks, list) or any(
+            not isinstance(block, dict) for block in blocks
+        ):
+            raise ValueError(
+                "current pages[].blocks must contain full block objects from get-structure"
+            )
+        kept: set[str] = set()
+        desired = page_plan["blocks"]
+        for block in blocks:
+            block_id = block.get("_id")
+            module = block.get("module")
+            if not isinstance(block_id, str) or not isinstance(module, str):
+                raise ValueError(
+                    "every current block must have string _id and module fields"
+                )
+            page_plan["current_blocks"].append({"block_id": block_id, "module": module})
+            if module in desired and module not in kept:
+                kept.add(module)
+            else:
+                reason = (
+                    "duplicate module"
+                    if module in kept
+                    else "not in confirmed page plan"
+                )
+                page_plan["removals"].append(
+                    {"block_id": block_id, "module": module, "reason": reason}
+                )
+
+    return {
+        "status": "captured",
+        "application_mode": "reconcile",
+        "landing_id": current.get("_id"),
+        "structure_sha256": canonical_hash(current),
+        "extra_pages": extra_pages,
+    }
+
+
+def build_plan(brief: dict, current_structure: object | None = None) -> dict:
     preset = choose_preset(brief)
     catalog_groups = brief["catalog"]["groups"]
+    pages, omissions = omit_unwritable_blocks(selected_pages(brief, preset), brief)
+    current_state = bind_current_state(pages, current_structure)
     warnings = []
-    if not catalog_groups:
-        warnings.append("No catalog groups supplied; newStore blocks cannot be wired.")
     brand = brief.get("brand", {})
     if not brand.get("logo"):
-        warnings.append("No logo supplied; keep the template text identity until approved.")
+        warnings.append(
+            "No logo supplied; keep the template text identity until approved."
+        )
     if preset == "live-service-events" and not brief.get("content", {}).get("events"):
-        warnings.append("No event data supplied; omit event-specific copy and scarcity claims.")
+        warnings.append(
+            "No event data supplied; omit event-specific copy and scarcity claims."
+        )
     plan = {
         "version": 1,
         "target": {
@@ -66,24 +244,59 @@ def build_plan(brief: dict) -> dict:
         "preset": preset,
         "requires_confirmation": True,
         "publication": "forbidden",
-        "order": ["backup", "theme", "pages", "navigation", "blocks", "copy_assets", "catalog_links", "verify", "preview"],
-        "pages": PRESET_PAGES[preset],
+        "order": [
+            "backup",
+            "theme",
+            "pages",
+            "navigation",
+            "blocks",
+            "copy_assets",
+            "catalog_links",
+            "verify",
+            "preview",
+        ],
+        "pages": pages,
+        "navigation": [{"name": page["name"], "path": page["path"]} for page in pages],
         "locales": brief["site"]["locales"],
+        "primary_locale": brief["site"]["primary_locale"],
         "catalog_sections": catalog_groups,
+        "featured_skus": brief["catalog"].get("featured_skus", []),
+        "brand": brand,
+        "content": brief.get("content", {}),
+        "sources": brief["sources"],
+        "omissions": omissions,
+        "current_state": current_state,
+        "brief_sha256": canonical_hash(brief),
+        "implemented_phases": ["pages", "blocks"],
+        "unsupported_phases": [
+            "theme",
+            "navigation",
+            "copy_assets",
+            "catalog_links",
+            "verify",
+            "preview",
+        ],
         "warnings": warnings,
     }
-    canonical = json.dumps(plan, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    plan["confirmation_id"] = "sha256:" + hashlib.sha256(canonical).hexdigest()[:12]
+    plan["confirmation_id"] = "sha256:" + canonical_hash(plan)[:12]
     return plan
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("brief", type=Path)
+    parser.add_argument(
+        "--structure",
+        type=Path,
+        help="get-structure JSON from the verified backup of an existing target",
+    )
     args = parser.parse_args()
     try:
         brief = load_brief(args.brief)
-    except ValueError as exc:
+        structure = None
+        if args.structure is not None:
+            structure = json.loads(args.structure.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     errors = validate(brief)
@@ -91,7 +304,12 @@ def main() -> int:
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
-    print(json.dumps(build_plan(brief), indent=2))
+    try:
+        plan = build_plan(brief, structure)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(plan, indent=2))
     return 0
 
 

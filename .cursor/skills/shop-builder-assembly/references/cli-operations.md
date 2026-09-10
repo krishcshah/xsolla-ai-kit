@@ -25,8 +25,10 @@ project overrides after preflight.
 
 - Slug/domain identifies landing-level reads and page creation.
 - Top-level `_id` from `get-structure` is the landing ID for block and asset commands.
-- `pages[]._id` is the page ID; `pages[].blocks[]` is the ordered list of block IDs.
-- Top-level `blocks[]` maps each block ID to its `module`, values, and components.
+- `pages[]._id` is the page ID; in the verified CLI 1.9.4 response,
+  `pages[].blocks[]` is the ordered list of full block objects containing `_id`,
+  `module`, values, and components.
+- The top-level `blocks[]` field contains landing-level block IDs in that response.
 - Re-read structure after every add, delete, duplicate, or move before constructing the
   next position- or ID-sensitive command.
 
@@ -49,3 +51,7 @@ claiming full catalog coverage.
 The first dedicated-project run also found defects in Publisher-session reuse,
 `verify-website`, and CLI preview authorization. See
 [`test-findings.md`](test-findings.md) for reproducible evidence and request IDs.
+
+The CLI does not expose page deletion. If an existing target contains paths outside
+the confirmed plan, stop before writes and report the extra paths instead of leaving
+a silently mixed preset or deleting the whole website.

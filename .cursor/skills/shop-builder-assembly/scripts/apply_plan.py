@@ -10,8 +10,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from render_plan import build_plan
-from validate_shop_brief import load_brief, validate
+from render_plan import build_plan, canonical_hash
+from validate_shop_brief import VERIFIED_BLOCK_MODULES, load_brief, validate
+
+BACKUP_FILE_NAMES = {
+    "config.json",
+    "websites.json",
+    "landing.json",
+    "structure.json",
+    "localization.json",
+    "assets.json",
+    "versions.json",
+}
 
 
 def run_json(*args: str) -> object:
@@ -74,45 +84,106 @@ def verified_backup(path: Path, expected: dict, slug: str) -> bool:
             or manifest.get("merchant_id") != expected["merchant_id"]
             or manifest.get("project_id") != expected["project_id"]
             or manifest.get("environment") != expected["environment"]
+            or manifest.get("read_only") is not True
         ):
             return False
-        for name, digest in manifest.get("sha256", {}).items():
+        files = manifest.get("files")
+        digests = manifest.get("sha256")
+        if (
+            not isinstance(files, list)
+            or not files
+            or any(
+                not isinstance(name, str) or Path(name).name != name for name in files
+            )
+            or len(files) != len(set(files))
+            or set(files) != BACKUP_FILE_NAMES
+            or not isinstance(digests, dict)
+            or set(files) != set(digests)
+        ):
+            return False
+        for name in files:
+            digest = digests[name]
+            if not isinstance(digest, str):
+                return False
             file_path = path / name
             if hashlib.sha256(file_path.read_bytes()).hexdigest() != digest:
                 return False
-        return bool(manifest.get("files"))
+        return True
     except (OSError, TypeError, json.JSONDecodeError):
         return False
+
+
+def backup_structure(path: Path) -> object:
+    try:
+        return json.loads((path / "structure.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cannot read backup structure: {exc}") from exc
+
+
+def run_preflight(brief_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).with_name("preflight.py")),
+            str(brief_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        raise RuntimeError(
+            result.stderr.strip() or result.stdout.strip() or "preflight failed"
+        )
 
 
 def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
     current = structure(slug)
     page = page_for_path(current, page_plan["path"])
     if page is None:
-        run_json(
-            "shopbuilder",
-            "add-page",
-            "--slug",
-            slug,
-            "--name",
-            page_plan["name"],
-            "--path",
-            page_plan["path"],
+        raise RuntimeError(
+            f"page {page_plan['path']} must be created in the page phase before reconciliation"
         )
-        page = page_for_path(structure(slug), page_plan["path"])
-    if page is None or not isinstance(page.get("_id"), str):
+    if not isinstance(page.get("_id"), str):
         raise RuntimeError(f"could not resolve page {page_plan['path']}")
 
     page_id = page["_id"]
     desired = page_plan["blocks"]
+    unverified = sorted(set(desired) - VERIFIED_BLOCK_MODULES)
+    if unverified:
+        raise RuntimeError(
+            "plan contains unverified block modules: " + ", ".join(unverified)
+        )
     kept: set[str] = set()
     removals: list[dict] = []
-    for block in page.get("blocks", []):
+    blocks = page.get("blocks", [])
+    if not isinstance(blocks, list) or any(
+        not isinstance(block, dict) for block in blocks
+    ):
+        raise RuntimeError("pages[].blocks must contain full block objects")
+    for block in blocks:
         module = block.get("module")
         if module in desired and module not in kept:
             kept.add(module)
         else:
             removals.append(block)
+    approved_removals = {
+        removal["block_id"]: removal["module"]
+        for removal in page_plan.get("removals", [])
+    }
+    unapproved = [
+        block
+        for block in removals
+        if approved_removals.get(block.get("_id")) != block.get("module")
+    ]
+    if unapproved:
+        details = ", ".join(
+            f"{block.get('module')}:{block.get('_id')}" for block in unapproved
+        )
+        raise RuntimeError(
+            "current page requires unconfirmed block removals; back up, re-render, "
+            f"and reconfirm the plan ({details})"
+        )
     for block in removals:
         run_json(
             "shopbuilder",
@@ -128,7 +199,9 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
 
     page = page_for_path(structure(slug), page_plan["path"])
     if page is None:
-        raise RuntimeError(f"page disappeared during reconciliation: {page_plan['path']}")
+        raise RuntimeError(
+            f"page disappeared during reconciliation: {page_plan['path']}"
+        )
     existing = [block.get("module") for block in page.get("blocks", [])]
     for module in desired:
         if module not in existing:
@@ -180,6 +253,29 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
     }
 
 
+def add_missing_pages(slug: str, page_plans: list[dict]) -> list[str]:
+    created: list[str] = []
+    current = structure(slug)
+    for page_plan in page_plans:
+        if page_for_path(current, page_plan["path"]) is not None:
+            continue
+        run_json(
+            "shopbuilder",
+            "add-page",
+            "--slug",
+            slug,
+            "--name",
+            page_plan["name"],
+            "--path",
+            page_plan["path"],
+        )
+        created.append(page_plan["path"])
+        current = structure(slug)
+        if page_for_path(current, page_plan["path"]) is None:
+            raise RuntimeError(f"could not resolve created page {page_plan['path']}")
+    return created
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("brief", type=Path)
@@ -191,9 +287,7 @@ def main() -> int:
         errors = validate(brief)
         if errors:
             raise RuntimeError("invalid shop brief: " + "; ".join(errors))
-        plan = build_plan(brief)
-        if args.confirmation_id != plan["confirmation_id"]:
-            raise RuntimeError("confirmation ID does not match the current plan")
+        run_preflight(args.brief)
 
         expected = brief["project"]
         config = data(run_json("config", "list"))
@@ -212,23 +306,30 @@ def main() -> int:
             if args.backup_dir is None:
                 raise RuntimeError("--backup-dir is required for an existing target")
             if not verified_backup(args.backup_dir, expected, slug):
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(Path(__file__).with_name("backup_shop.py")),
-                        "--brief",
-                        str(args.brief),
-                        "--slug",
-                        slug,
-                        "--output-dir",
-                        str(args.backup_dir),
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=False,
+                raise RuntimeError(
+                    "a complete verified backup created before confirmation is required"
                 )
-                if result.returncode:
-                    raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+            saved_structure = backup_structure(args.backup_dir)
+            plan = build_plan(brief, saved_structure)
+        else:
+            plan = build_plan(brief)
+
+        if args.confirmation_id != plan["confirmation_id"]:
+            raise RuntimeError("confirmation ID does not match the current plan")
+
+        if existed:
+            current = structure(slug)
+            if canonical_hash(current) != plan["current_state"]["structure_sha256"]:
+                raise RuntimeError(
+                    "target structure changed after backup; back up, re-render, and reconfirm"
+                )
+            extra_pages = plan["current_state"]["extra_pages"]
+            if extra_pages:
+                paths = ", ".join(page["path"] for page in extra_pages)
+                raise RuntimeError(
+                    "target contains pages outside the confirmed plan and the CLI cannot "
+                    f"delete pages safely: {paths}"
+                )
         else:
             run_json(
                 "shopbuilder",
@@ -243,24 +344,77 @@ def main() -> int:
 
         current = structure(slug)
         if current.get("type") is None:
-            run_json("shopbuilder", "set-landing-type", "--slug", slug, "--type", "store")
+            run_json(
+                "shopbuilder", "set-landing-type", "--slug", slug, "--type", "store"
+            )
             current = structure(slug)
         if current.get("type") != "store":
-            raise RuntimeError(f"target landing type is {current.get('type')!r}, expected 'store'")
+            raise RuntimeError(
+                f"target landing type is {current.get('type')!r}, expected 'store'"
+            )
         landing_id = current.get("_id")
         if not isinstance(landing_id, str):
             raise RuntimeError("landing has no _id")
+
+        created_pages = add_missing_pages(slug, plan["pages"])
+        if not existed:
+            print(
+                json.dumps(
+                    {
+                        "operation_succeeded": True,
+                        "assembly_complete": False,
+                        "status": "bootstrap-complete",
+                        "confirmation_id": plan["confirmation_id"],
+                        "slug": slug,
+                        "landing_id": landing_id,
+                        "created_pages": created_pages,
+                        "next_action": (
+                            "Back up the generated site, render a target-bound plan, "
+                            "and explicitly confirm its exact removals before reconciliation."
+                        ),
+                        "published": False,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+
+        if created_pages:
+            print(
+                json.dumps(
+                    {
+                        "operation_succeeded": True,
+                        "assembly_complete": False,
+                        "status": "page-phase-complete",
+                        "confirmation_id": plan["confirmation_id"],
+                        "slug": slug,
+                        "landing_id": landing_id,
+                        "created_pages": created_pages,
+                        "next_action": (
+                            "Back up the changed site, re-render its generated block IDs, "
+                            "and explicitly confirm before block reconciliation."
+                        ),
+                        "published": False,
+                    },
+                    indent=2,
+                )
+            )
+            return 0
 
         pages = [reconcile_page(slug, landing_id, page) for page in plan["pages"]]
         print(
             json.dumps(
                 {
-                    "ok": True,
+                    "operation_succeeded": True,
+                    "assembly_complete": not plan["unsupported_phases"],
+                    "status": "implemented-phases-applied",
                     "confirmation_id": plan["confirmation_id"],
                     "slug": slug,
                     "landing_id": landing_id,
                     "site_existed": existed,
                     "pages": pages,
+                    "completed_phases": plan["implemented_phases"],
+                    "pending_phases": plan["unsupported_phases"],
                     "published": False,
                 },
                 indent=2,

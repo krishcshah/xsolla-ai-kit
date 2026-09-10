@@ -60,6 +60,21 @@ brief must also contain `"test_project_acknowledged": true`.
 Never put API keys, session cookies, passwords, or tokens in the brief.
 Verify credentials through the CLI credential store instead.
 
+`content.page_overrides`, when present, replaces the selected preset's page list. It
+is a non-empty array of complete page objects:
+
+```json
+{
+  "page_overrides": [
+    {"name": "Shop", "path": "/shop", "blocks": ["header", "newStore", "footer"]}
+  ]
+}
+```
+
+Paths must be unique root-relative kebab-case paths. Blocks must be module names
+already verified on the dedicated test project; unverified modules are rejected
+before planning or writes.
+
 ## Handoff contract for other skills
 
 - Description skills populate `game`, approved `content`, and relevant `sources`.

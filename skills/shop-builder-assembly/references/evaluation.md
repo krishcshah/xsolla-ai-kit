@@ -1,7 +1,8 @@
 # End-to-end evaluation log
 
 Record one JSON object per line. Do not store credentials, partner production IDs, or
-customer data. A run represents assembly from a blank mentor-provided sandbox project.
+customer data. A run represents assembly from a blank approved sandbox or dedicated
+Publisher Account test project; never use a partner project.
 
 ```json
 {"run_id":"run-01","preset":"mobile-single-page","result":"success","manual_interventions":1,"failure":null,"notes":"Preview matched plan"}

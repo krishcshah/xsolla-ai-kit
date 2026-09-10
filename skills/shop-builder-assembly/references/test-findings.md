@@ -15,6 +15,9 @@ from committed evidence.
   sections in a blank project.
 - The final mobile preset rendered in Publisher Account and its review preview with
   `header → leadGameSales → newStore → faq → footer`.
+- Captured `get-structure` output places full block objects in `pages[].blocks[]` and
+  landing-level block IDs in the top-level `blocks[]` array. This shape is covered by
+  a regression test because earlier draft documentation described it in reverse.
 
 ## CLI gaps found
 

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -47,25 +48,94 @@ class ApplyPlanTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            for name in apply_plan.BACKUP_FILE_NAMES:
+                (root / name).write_bytes(b"{}\n")
             structure = root / "structure.json"
-            structure.write_bytes(b"{}\n")
-            digest = hashlib.sha256(structure.read_bytes()).hexdigest()
             manifest = {
                 "slug": "test-shop",
                 **expected,
-                "files": ["structure.json"],
-                "sha256": {"structure.json": digest},
+                "read_only": True,
+                "files": sorted(apply_plan.BACKUP_FILE_NAMES),
+                "sha256": {
+                    name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+                    for name in apply_plan.BACKUP_FILE_NAMES
+                },
             }
-            (root / "manifest.json").write_text(
-                json.dumps(manifest), encoding="utf-8"
-            )
-            self.assertTrue(
-                apply_plan.verified_backup(root, expected, "test-shop")
-            )
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            self.assertTrue(apply_plan.verified_backup(root, expected, "test-shop"))
             structure.write_bytes(b"changed\n")
-            self.assertFalse(
-                apply_plan.verified_backup(root, expected, "test-shop")
-            )
+            self.assertFalse(apply_plan.verified_backup(root, expected, "test-shop"))
+
+    def test_verified_backup_rejects_partial_digest_manifest(self) -> None:
+        expected = {"merchant_id": 100, "project_id": 200, "environment": "test"}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("structure.json", "landing.json"):
+                (root / name).write_bytes(b"{}\n")
+            manifest = {
+                "slug": "test-shop",
+                **expected,
+                "read_only": True,
+                "files": sorted(apply_plan.BACKUP_FILE_NAMES),
+                "sha256": {
+                    "structure.json": hashlib.sha256(
+                        (root / "structure.json").read_bytes()
+                    ).hexdigest()
+                },
+            }
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            self.assertFalse(apply_plan.verified_backup(root, expected, "test-shop"))
+
+    def test_real_cli_shape_keeps_full_blocks_on_pages(self) -> None:
+        structure = {
+            "_id": "landing",
+            "blocks": ["site-block-id"],
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [{"_id": "block-1", "module": "header"}],
+                }
+            ],
+        }
+        page = apply_plan.page_for_path(structure, "/")
+        self.assertEqual("header", page["blocks"][0]["module"])
+
+    def test_reconciliation_refuses_unconfirmed_removal_before_write(self) -> None:
+        current = {
+            "_id": "landing",
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [
+                        {"_id": "header-id", "module": "header"},
+                        {"_id": "custom-id", "module": "gallery"},
+                    ],
+                }
+            ],
+        }
+        plan = {
+            "name": "Home",
+            "path": "/",
+            "blocks": ["header"],
+            "removals": [],
+        }
+        with (
+            mock.patch.object(apply_plan, "structure", return_value=current),
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "unconfirmed block removals"):
+                apply_plan.reconcile_page("shop", "landing", plan)
+            run_json.assert_not_called()
+
+    def test_run_preflight_propagates_failure(self) -> None:
+        failed = mock.Mock(
+            returncode=1, stderr="Preflight failed: wrong project", stdout=""
+        )
+        with mock.patch.object(apply_plan.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(RuntimeError, "wrong project"):
+                apply_plan.run_preflight(Path("brief.json"))
 
 
 if __name__ == "__main__":

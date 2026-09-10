@@ -48,8 +48,10 @@ Treat the catalog and presets as provisional until the decisions in
    rather than overriding IDs ad hoc on later commands.
 3. If the target site exists, export it before the first write with
    `scripts/backup_shop.py --brief <brief.json> --slug <slug> --output-dir <dir>`.
-4. Render the proposed plan with `scripts/render_plan.py <brief.json>` and show the
-   complete ordered plan, including removals and catalog mappings.
+4. Render the proposed plan with
+   `scripts/render_plan.py <brief.json> --structure <backup-dir>/structure.json` and
+   show the complete ordered plan, including exact block IDs to remove and catalog
+   mappings. Omit `--structure` only for a new slug's bootstrap-only plan.
 5. Ask for explicit confirmation of the plan's `confirmation_id` immediately before
    the first remote write. Earlier permission to "build a shop" is not confirmation
    of a new plan. Re-render and reconfirm if the brief or plan changes.
@@ -58,6 +60,11 @@ The brief must target either a sandbox context or a dedicated test project that 
 user explicitly acknowledges as safe. Never use a partner's live project. Never
 publish, attach a production domain, enable live payments, or apply a saved version.
 A human publishes in Publisher Account.
+
+A newly created Shop Builder site contains generated template blocks whose IDs do not
+exist before creation. Treat creation as a confirmed bootstrap phase, then export,
+re-render, and reconfirm the target-bound plan before deleting any generated block.
+If the target changes after export, stop and repeat that sequence.
 
 ## Assembly order
 

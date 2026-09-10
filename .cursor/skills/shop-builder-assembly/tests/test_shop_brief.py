@@ -21,11 +21,15 @@ def load_module(name: str, path: Path):
     return module
 
 
-validator = load_module("validate_shop_brief", ROOT / "scripts" / "validate_shop_brief.py")
+validator = load_module(
+    "validate_shop_brief", ROOT / "scripts" / "validate_shop_brief.py"
+)
 render_plan = load_module("render_plan", ROOT / "scripts" / "render_plan.py")
 preflight = load_module("preflight", ROOT / "scripts" / "preflight.py")
 backup_shop = load_module("backup_shop", ROOT / "scripts" / "backup_shop.py")
-summarize_evals = load_module("summarize_evals", ROOT / "scripts" / "summarize_evals.py")
+summarize_evals = load_module(
+    "summarize_evals", ROOT / "scripts" / "summarize_evals.py"
+)
 
 
 class ShopBriefTests(unittest.TestCase):
@@ -83,7 +87,68 @@ class ShopBriefTests(unittest.TestCase):
     def test_credentials_are_rejected(self) -> None:
         brief = copy.deepcopy(self.brief)
         brief["project"]["api_key"] = "do-not-store-this"
-        self.assertIn("project.api_key must not contain credentials", validator.validate(brief))
+        self.assertIn(
+            "project.api_key must not contain credentials", validator.validate(brief)
+        )
+
+    def test_common_credential_key_variants_are_rejected(self) -> None:
+        for key in ("apiKey", "access_token", "client_secret", "session_cookie"):
+            with self.subTest(key=key):
+                brief = copy.deepcopy(self.brief)
+                brief["content"][key] = "do-not-store-this"
+                self.assertIn(
+                    f"content.{key} must not contain credentials",
+                    validator.validate(brief),
+                )
+
+    def test_boolean_project_ids_are_rejected(self) -> None:
+        brief = copy.deepcopy(self.brief)
+        brief["project"]["project_id"] = True
+        self.assertIn(
+            "project.project_id must be a positive integer", validator.validate(brief)
+        )
+
+    def test_malformed_containers_return_errors_instead_of_raising(self) -> None:
+        cases = [
+            ("platforms", ["mobile", []], "game.platforms must use:"),
+            ("lifecycle", [], "game.lifecycle must use:"),
+            ("environment", [], "project.environment must be sandbox or test"),
+            ("preset", [], "site.preset must use:"),
+            ("locales", 7, "site.locales must be a non-empty list"),
+            ("group type", [], "catalog.groups[0].type must use:"),
+            ("brand", "blue", "brand must be an object"),
+            ("content", [], "content must be an object"),
+        ]
+        for name, value, expected in cases:
+            with self.subTest(name=name):
+                brief = copy.deepcopy(self.brief)
+                if name == "platforms":
+                    brief["game"]["platforms"] = value
+                elif name == "lifecycle":
+                    brief["game"]["lifecycle"] = value
+                elif name == "environment":
+                    brief["project"]["environment"] = value
+                elif name == "preset":
+                    brief["site"]["preset"] = value
+                elif name == "locales":
+                    brief["site"]["locales"] = value
+                elif name == "group type":
+                    brief["catalog"]["groups"][0]["type"] = value
+                else:
+                    brief[name] = value
+                self.assertTrue(
+                    any(
+                        error.startswith(expected)
+                        for error in validator.validate(brief)
+                    )
+                )
+
+    def test_sources_are_required_and_typed(self) -> None:
+        brief = copy.deepcopy(self.brief)
+        del brief["sources"]
+        self.assertIn("sources must be a non-empty list", validator.validate(brief))
+        brief["sources"] = [{}]
+        self.assertIn("sources[0].kind is required", validator.validate(brief))
 
     def test_same_all_group_is_allowed_for_different_types(self) -> None:
         brief = copy.deepcopy(self.brief)
@@ -108,8 +173,10 @@ class ShopBriefTests(unittest.TestCase):
         }
         self.assertTrue(preflight.active_publisher_account(accounts))
         self.assertEqual(
-            {"known"},
-            preflight.external_ids({"data": [{"external_id": "known"}]}),
+            {("known", "bundle")},
+            preflight.group_identities(
+                {"data": [{"external_id": "known", "type": "bundle"}]}
+            ),
         )
 
     def test_backup_resolves_wrapped_landing_id(self) -> None:
@@ -158,6 +225,23 @@ class ShopBriefTests(unittest.TestCase):
         ]
         summary = summarize_evals.summarize(runs)
         self.assertFalse(summarize_evals.passes(summary))
+
+    def test_eval_rejects_boolean_intervention_count(self) -> None:
+        summary = summarize_evals.summarize(
+            [
+                {
+                    "run_id": "run-bool",
+                    "preset": "mobile-single-page",
+                    "result": "success",
+                    "manual_interventions": True,
+                    "failure": None,
+                }
+            ]
+        )
+        self.assertIn(
+            "run 1: manual_interventions must be a non-negative integer",
+            summary["validation_errors"],
+        )
 
 
 if __name__ == "__main__":

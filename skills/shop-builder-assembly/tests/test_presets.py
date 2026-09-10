@@ -65,6 +65,63 @@ class PresetTests(unittest.TestCase):
         second = render_plan.build_plan(self.brief)["confirmation_id"]
         self.assertNotEqual(first, second)
 
+    def test_confirmation_covers_write_affecting_inputs(self) -> None:
+        first = render_plan.build_plan(self.brief)["confirmation_id"]
+        self.brief["brand"]["logo"] = "https://cdn.example/logo.png"
+        second = render_plan.build_plan(self.brief)["confirmation_id"]
+        self.assertNotEqual(first, second)
+        self.brief["catalog"]["featured_skus"].append("founder-pack")
+        third = render_plan.build_plan(self.brief)["confirmation_id"]
+        self.assertNotEqual(second, third)
+
+    def test_empty_catalog_omits_store_block(self) -> None:
+        self.brief["catalog"]["groups"] = []
+        plan = render_plan.build_plan(self.brief)
+        self.assertNotIn("newStore", plan["pages"][0]["blocks"])
+        self.assertIn("newStore", {item["module"] for item in plan["omissions"]})
+
+    def test_page_overrides_replace_preset_pages(self) -> None:
+        self.brief["content"]["page_overrides"] = [
+            {
+                "name": "Shop",
+                "path": "/shop",
+                "blocks": ["header", "newStore", "footer"],
+            }
+        ]
+        plan = render_plan.build_plan(self.brief)
+        self.assertEqual(["/shop"], [page["path"] for page in plan["pages"]])
+
+    def test_target_state_binds_exact_block_removals(self) -> None:
+        structure = {
+            "ok": True,
+            "data": {
+                "_id": "landing",
+                "pages": [
+                    {
+                        "_id": "home",
+                        "name": "Home",
+                        "path": "/",
+                        "blocks": [
+                            {"_id": "keep", "module": "header"},
+                            {"_id": "remove", "module": "gallery"},
+                        ],
+                    }
+                ],
+            },
+        }
+        plan = render_plan.build_plan(self.brief, structure)
+        self.assertEqual(
+            [
+                {
+                    "block_id": "remove",
+                    "module": "gallery",
+                    "reason": "not in confirmed page plan",
+                }
+            ],
+            plan["pages"][0]["removals"],
+        )
+        self.assertEqual("reconcile", plan["current_state"]["application_mode"])
+
 
 if __name__ == "__main__":
     unittest.main()

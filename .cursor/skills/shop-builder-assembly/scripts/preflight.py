@@ -63,11 +63,12 @@ def active_publisher_account(value: object) -> bool:
     )
 
 
-def external_ids(value: object) -> set[str]:
+def group_identities(value: object) -> set[tuple[str, str]]:
     return {
-        item["external_id"]
+        (item["external_id"], item["type"])
         for item in objects(data(value))
         if isinstance(item.get("external_id"), str)
+        and isinstance(item.get("type"), str)
     }
 
 
@@ -113,9 +114,9 @@ def main() -> int:
             "--project-id",
             str(expected["project_id"]),
         )
-        available_groups = external_ids(groups)
+        available_groups = group_identities(groups)
         requested_groups = {
-            group["external_id"]
+            (group["external_id"], group["type"])
             for group in brief["catalog"]["groups"]
             if group["external_id"] != "__all__"
         }
@@ -123,7 +124,10 @@ def main() -> int:
         if missing_groups:
             raise RuntimeError(
                 "catalog groups do not exist in the configured project: "
-                + ", ".join(missing_groups)
+                + ", ".join(
+                    f"{group_type}:{external_id}"
+                    for external_id, group_type in missing_groups
+                )
             )
 
         result = {
@@ -144,7 +148,12 @@ def main() -> int:
                 "landing_id": landing.get("_id") if landing else None,
                 "type": landing.get("type") if landing else None,
             },
-            "catalog": {"verified_groups": sorted(requested_groups)},
+            "catalog": {
+                "verified_groups": [
+                    {"external_id": external_id, "type": group_type}
+                    for external_id, group_type in sorted(requested_groups)
+                ]
+            },
         }
         print(json.dumps(result, indent=2))
         return 0

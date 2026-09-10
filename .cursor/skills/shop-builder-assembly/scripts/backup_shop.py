@@ -93,7 +93,9 @@ def main() -> int:
         landing = run_json("shopbuilder", "get-landing", "--slug", args.slug)
         structure = run_json("shopbuilder", "get-structure", "--slug", args.slug)
         localization = run_json("shopbuilder", "get-localization", "--slug", args.slug)
-        assets = run_json("shopbuilder", "list-assets", "--landing-id", landing_id(structure))
+        assets = run_json(
+            "shopbuilder", "list-assets", "--landing-id", landing_id(structure)
+        )
         versions = run_json("shopbuilder", "list-versions", "--slug", args.slug)
 
         args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -123,12 +125,10 @@ def main() -> int:
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "read_only": True,
                 "files": files,
-                "sha256": {
-                    name: checksum(args.output_dir / name) for name in files
-                },
+                "sha256": {name: checksum(args.output_dir / name) for name in files},
             },
         )
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     print(args.output_dir.resolve())
