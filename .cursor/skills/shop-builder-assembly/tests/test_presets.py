@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import re
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+
+def load_render_plan():
+    path = ROOT / "scripts" / "render_plan.py"
+    spec = importlib.util.spec_from_file_location("render_plan_for_presets", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+render_plan = load_render_plan()
+
+
+class PresetTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.brief = json.loads(
+            (ROOT / "examples" / "mobile-single-page.json").read_text(encoding="utf-8")
+        )
+
+    def test_all_presets_require_confirmation_and_forbid_publication(self) -> None:
+        for preset in render_plan.PRESET_PAGES:
+            with self.subTest(preset=preset):
+                self.brief["site"]["preset"] = preset
+                plan = render_plan.build_plan(self.brief)
+                self.assertIs(plan["requires_confirmation"], True)
+                self.assertEqual("forbidden", plan["publication"])
+                self.assertRegex(plan["confirmation_id"], r"^sha256:[0-9a-f]{12}$")
+
+    def test_page_paths_are_unique_and_bounded_by_header_footer(self) -> None:
+        for preset, pages in render_plan.PRESET_PAGES.items():
+            with self.subTest(preset=preset):
+                paths = [page["path"] for page in pages]
+                self.assertEqual(len(paths), len(set(paths)))
+                for page in pages:
+                    self.assertEqual("header", page["blocks"][0])
+                    self.assertEqual("footer", page["blocks"][-1])
+
+    def test_every_preset_module_is_in_the_catalog(self) -> None:
+        catalog = (ROOT / "references" / "block-catalog.md").read_text(encoding="utf-8")
+        documented = set(re.findall(r"^\| `([^`]+)` \|", catalog, flags=re.MULTILINE))
+        used = {
+            module
+            for pages in render_plan.PRESET_PAGES.values()
+            for page in pages
+            for module in page["blocks"]
+        }
+        self.assertEqual(set(), used - documented)
+
+    def test_confirmation_id_changes_with_target(self) -> None:
+        first = render_plan.build_plan(self.brief)["confirmation_id"]
+        self.brief["site"]["slug"] = "another-shop"
+        second = render_plan.build_plan(self.brief)["confirmation_id"]
+        self.assertNotEqual(first, second)
+
+
+if __name__ == "__main__":
+    unittest.main()

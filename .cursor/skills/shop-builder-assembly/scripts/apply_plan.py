@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""Apply a confirmed Shop Builder plan without publishing the landing."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from render_plan import build_plan
+from validate_shop_brief import load_brief, validate
+
+
+def run_json(*args: str) -> object:
+    command = ["xsolla", *args, "--json"]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip()
+        if "publisher session bootstrap" in detail:
+            detail += (
+                "; refresh the supported Publisher login with `xsolla auth login` "
+                "and rerun—never copy a browser PA token"
+            )
+        raise RuntimeError(f"{' '.join(args)} failed: {detail}")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{' '.join(args)} returned invalid JSON") from exc
+
+
+def data(value: object) -> object:
+    if isinstance(value, dict) and value.get("ok") is True and "data" in value:
+        return value["data"]
+    return value
+
+
+def website_exists(value: object, slug: str) -> bool:
+    payload = data(value)
+    if isinstance(payload, dict):
+        payload = payload.get("items", payload.get("landings", payload))
+    if isinstance(payload, list):
+        return any(
+            isinstance(item, dict)
+            and (item.get("domain") == slug or item.get("slug") == slug)
+            for item in payload
+        )
+    text = json.dumps(payload, sort_keys=True)
+    return f'"{slug}"' in text
+
+
+def structure(slug: str) -> dict:
+    value = data(run_json("shopbuilder", "get-structure", "--slug", slug))
+    if not isinstance(value, dict) or not isinstance(value.get("pages"), list):
+        raise RuntimeError("get-structure returned an unexpected shape")
+    return value
+
+
+def page_for_path(value: dict, path: str) -> dict | None:
+    for page in value["pages"]:
+        if isinstance(page, dict) and page.get("path") == path:
+            return page
+    return None
+
+
+def verified_backup(path: Path, expected: dict, slug: str) -> bool:
+    manifest_path = path / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if (
+            manifest.get("slug") != slug
+            or manifest.get("merchant_id") != expected["merchant_id"]
+            or manifest.get("project_id") != expected["project_id"]
+            or manifest.get("environment") != expected["environment"]
+        ):
+            return False
+        for name, digest in manifest.get("sha256", {}).items():
+            file_path = path / name
+            if hashlib.sha256(file_path.read_bytes()).hexdigest() != digest:
+                return False
+        return bool(manifest.get("files"))
+    except (OSError, TypeError, json.JSONDecodeError):
+        return False
+
+
+def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
+    current = structure(slug)
+    page = page_for_path(current, page_plan["path"])
+    if page is None:
+        run_json(
+            "shopbuilder",
+            "add-page",
+            "--slug",
+            slug,
+            "--name",
+            page_plan["name"],
+            "--path",
+            page_plan["path"],
+        )
+        page = page_for_path(structure(slug), page_plan["path"])
+    if page is None or not isinstance(page.get("_id"), str):
+        raise RuntimeError(f"could not resolve page {page_plan['path']}")
+
+    page_id = page["_id"]
+    desired = page_plan["blocks"]
+    kept: set[str] = set()
+    removals: list[dict] = []
+    for block in page.get("blocks", []):
+        module = block.get("module")
+        if module in desired and module not in kept:
+            kept.add(module)
+        else:
+            removals.append(block)
+    for block in removals:
+        run_json(
+            "shopbuilder",
+            "delete-block",
+            "--landing-id",
+            landing_id,
+            "--page-id",
+            page_id,
+            "--blockid",
+            block["_id"],
+            "--force",
+        )
+
+    page = page_for_path(structure(slug), page_plan["path"])
+    if page is None:
+        raise RuntimeError(f"page disappeared during reconciliation: {page_plan['path']}")
+    existing = [block.get("module") for block in page.get("blocks", [])]
+    for module in desired:
+        if module not in existing:
+            run_json(
+                "shopbuilder",
+                "add-block",
+                "--landing-id",
+                landing_id,
+                "--page-id",
+                page_id,
+                "--block",
+                module,
+            )
+            existing.append(module)
+
+    for destination, module in enumerate(desired):
+        page = page_for_path(structure(slug), page_plan["path"])
+        if page is None:
+            raise RuntimeError(f"page disappeared during ordering: {page_plan['path']}")
+        modules = [block.get("module") for block in page.get("blocks", [])]
+        source = modules.index(module)
+        if source != destination:
+            run_json(
+                "shopbuilder",
+                "move-block",
+                "--landing-id",
+                landing_id,
+                "--page-id",
+                page_id,
+                "--source",
+                str(source),
+                "--destination",
+                str(destination),
+            )
+
+    final_page = page_for_path(structure(slug), page_plan["path"])
+    if final_page is None:
+        raise RuntimeError(f"could not read final page {page_plan['path']}")
+    final_modules = [block.get("module") for block in final_page.get("blocks", [])]
+    if final_modules != desired:
+        raise RuntimeError(
+            f"block reconciliation failed for {page_plan['path']}: {final_modules}"
+        )
+    return {
+        "path": page_plan["path"],
+        "page_id": page_id,
+        "blocks": final_modules,
+        "removed_blocks": len(removals),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("brief", type=Path)
+    parser.add_argument("--confirmation-id", required=True)
+    parser.add_argument("--backup-dir", type=Path)
+    args = parser.parse_args()
+    try:
+        brief = load_brief(args.brief)
+        errors = validate(brief)
+        if errors:
+            raise RuntimeError("invalid shop brief: " + "; ".join(errors))
+        plan = build_plan(brief)
+        if args.confirmation_id != plan["confirmation_id"]:
+            raise RuntimeError("confirmation ID does not match the current plan")
+
+        expected = brief["project"]
+        config = data(run_json("config", "list"))
+        if not isinstance(config, dict):
+            raise RuntimeError("xsolla config list returned an unexpected shape")
+        if config.get("merchant_id") != expected["merchant_id"]:
+            raise RuntimeError("CLI merchant_id does not match the shop brief")
+        if config.get("project_id") != expected["project_id"]:
+            raise RuntimeError("CLI project_id does not match the shop brief")
+        if (config.get("sandbox") is True) != (expected["environment"] == "sandbox"):
+            raise RuntimeError("CLI sandbox setting does not match the shop brief")
+
+        slug = brief["site"]["slug"]
+        existed = website_exists(run_json("shopbuilder", "list-websites"), slug)
+        if existed:
+            if args.backup_dir is None:
+                raise RuntimeError("--backup-dir is required for an existing target")
+            if not verified_backup(args.backup_dir, expected, slug):
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(Path(__file__).with_name("backup_shop.py")),
+                        "--brief",
+                        str(args.brief),
+                        "--slug",
+                        slug,
+                        "--output-dir",
+                        str(args.backup_dir),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode:
+                    raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+        else:
+            run_json(
+                "shopbuilder",
+                "create-website",
+                "--name",
+                brief["site"]["name"],
+                "--slug",
+                slug,
+                "--type",
+                "topup",
+            )
+
+        current = structure(slug)
+        if current.get("type") is None:
+            run_json("shopbuilder", "set-landing-type", "--slug", slug, "--type", "store")
+            current = structure(slug)
+        if current.get("type") != "store":
+            raise RuntimeError(f"target landing type is {current.get('type')!r}, expected 'store'")
+        landing_id = current.get("_id")
+        if not isinstance(landing_id, str):
+            raise RuntimeError("landing has no _id")
+
+        pages = [reconcile_page(slug, landing_id, page) for page in plan["pages"]]
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "confirmation_id": plan["confirmation_id"],
+                    "slug": slug,
+                    "landing_id": landing_id,
+                    "site_existed": existed,
+                    "pages": pages,
+                    "published": False,
+                },
+                indent=2,
+            )
+        )
+        return 0
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"Apply failed: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

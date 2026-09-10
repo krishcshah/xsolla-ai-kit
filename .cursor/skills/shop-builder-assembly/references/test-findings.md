@@ -1,0 +1,33 @@
+# Test-project findings
+
+Evidence below comes from a dedicated Publisher Account test project; it is not a
+partner project. The website remains unpublished. Project identifiers are omitted
+from committed evidence.
+
+## Verified behavior
+
+- `create-website`, `set-landing-type --type store`, `add-page`, `add-block`,
+  `delete-block`, `move-block`, `update-block`, and `update-many-localization` wrote
+  successfully through Xsolla CLI 1.9.4.
+- A new store page is scaffolded with `header`, `leadGameSales`, `description`,
+  `packs`, `bento-grid`, `gallery`, `requirements`, `faq`, and `footer` modules.
+- `add-block --block newStore` succeeds and creates Shop Builder test-catalog
+  sections in a blank project.
+- The final mobile preset rendered in Publisher Account and its review preview with
+  `header → leadGameSales → newStore → faq → footer`.
+
+## CLI gaps found
+
+1. Cookie-auth commands bootstrap a new Publisher session for every CLI process. A
+   valid `xsolla auth login` token can stop yielding a cookie after one or more
+   commands, and repeated supported logins eventually caused HTTP 429. The CLI needs
+   a secure cached Shop Builder session or another non-manual multi-command flow.
+2. `verify-website --slug ...` returned HTTP 400 because the generated request omitted
+   required `draftPagesIds` (request ID `6ac16aca0642a5f39b62dfb9045c4d77`).
+3. `enable-preview` and `preview-link` returned `admin_privileges_requred` for a
+   Publisher Account project owner, while the same user could open Preview in the
+   Publisher Account editor. Request IDs: `a361329b109800eaed7a48856185fe7b`
+   and `146f3c9438cacf66102e1031434f5033`.
+
+Do not work around these gaps by copying `pa-v4-token` from browser storage. Continue
+to use `xsolla auth login` and link the CLI tickets to SB-8796.
