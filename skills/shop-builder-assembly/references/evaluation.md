@@ -23,6 +23,20 @@ Store the completed log as `evals/runs.jsonl`, then run:
 python3 scripts/summarize_evals.py evals/runs.jsonl
 ```
 
+After recording run 001, prepare a balanced local matrix for runs 002–010 with:
+
+```bash
+python3 scripts/prepare_eval_briefs.py \
+  --base-brief /path/to/approved-test-brief.json \
+  --output-dir /path/to/local-eval-briefs
+```
+
+The generator creates three briefs for each preset with unique slugs. It carries only
+the already approved test-project identity and catalog mappings from the base brief,
+adds clearly labeled synthetic evaluation content, and performs no remote operations.
+Every generated plan still requires its own backup and exact confirmation ID before
+writes.
+
 The command passes only with at least 10 valid runs, at least 80% successes, and no
 run exceeding two manual interventions. Preserve failed runs; do not rerun and replace
 them merely to improve the result.
