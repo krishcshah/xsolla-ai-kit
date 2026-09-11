@@ -135,7 +135,7 @@ class ApplyPlanTests(unittest.TestCase):
         )
         with mock.patch.object(apply_plan.subprocess, "run", return_value=failed):
             with self.assertRaisesRegex(RuntimeError, "wrong project"):
-                apply_plan.run_preflight(Path("brief.json"))
+                apply_plan.run_preflight(Path("brief.json"), None)
 
 
 if __name__ == "__main__":

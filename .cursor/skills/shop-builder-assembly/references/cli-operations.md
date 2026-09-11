@@ -8,6 +8,7 @@ project overrides after preflight.
 |---|---|---|---|
 | Discover | `xsolla config list --json` | Local profile | Merchant, project, environment/sandbox match |
 | Discover | `xsolla auth list-account --json` | Credential store | Active Publisher login state |
+| Safety | `preflight.py --approved-test-projects <file>` | Separate local approval record | Exact non-sandbox test-project identity is allowlisted |
 | Discover | `xsolla shopbuilder list-websites --json` | Project context | Slug, landing ID, type |
 | Backup | `get-landing`, `get-structure`, `get-localization`, `list-assets`, `list-versions` | Existing slug | Restorable configuration evidence |
 | Bootstrap | `create-website --type topup` | Name, slug | Empty landing with `type:null` |

@@ -42,8 +42,10 @@ Treat the catalog and presets as provisional until the decisions in
 
 ## Non-negotiable safety gate
 
-1. Run `scripts/preflight.py <brief.json>`; read back the matched merchant ID, project
-   ID, safety environment, active Publisher login, target site, and catalog groups.
+1. Run `scripts/preflight.py <brief.json>`; for a non-sandbox test project, also pass
+   `--approved-test-projects <local-allowlist.json>`. Read back the matched merchant
+   ID, project ID, safety environment, approval reference, active Publisher login,
+   target site, and catalog groups.
 2. Stop if the CLI context differs from the brief; switch context and rerun preflight
    rather than overriding IDs ad hoc on later commands.
 3. If the target site exists, export it before the first write with
@@ -57,7 +59,9 @@ Treat the catalog and presets as provisional until the decisions in
    of a new plan. Re-render and reconfirm if the brief or plan changes.
 
 The brief must target either a sandbox context or a dedicated test project that the
-user explicitly acknowledges as safe. Never use a partner's live project. Never
+user explicitly acknowledges as safe. A `test` target must also match a separate
+local allowlist record containing the exact IDs, approver, and approval reference;
+the brief alone is not approval evidence. Never use a partner's live project. Never
 publish, attach a production domain, enable live payments, or apply a saved version.
 A human publishes in Publisher Account.
 

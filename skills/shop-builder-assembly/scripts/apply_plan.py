@@ -120,13 +120,16 @@ def backup_structure(path: Path) -> object:
         raise RuntimeError(f"cannot read backup structure: {exc}") from exc
 
 
-def run_preflight(brief_path: Path) -> None:
+def run_preflight(brief_path: Path, approved_test_projects: Path | None) -> None:
+    command = [
+        sys.executable,
+        str(Path(__file__).with_name("preflight.py")),
+        str(brief_path),
+    ]
+    if approved_test_projects is not None:
+        command.extend(["--approved-test-projects", str(approved_test_projects)])
     result = subprocess.run(
-        [
-            sys.executable,
-            str(Path(__file__).with_name("preflight.py")),
-            str(brief_path),
-        ],
+        command,
         capture_output=True,
         text=True,
         check=False,
@@ -281,13 +284,14 @@ def main() -> int:
     parser.add_argument("brief", type=Path)
     parser.add_argument("--confirmation-id", required=True)
     parser.add_argument("--backup-dir", type=Path)
+    parser.add_argument("--approved-test-projects", type=Path)
     args = parser.parse_args()
     try:
         brief = load_brief(args.brief)
         errors = validate(brief)
         if errors:
             raise RuntimeError("invalid shop brief: " + "; ".join(errors))
-        run_preflight(args.brief)
+        run_preflight(args.brief, args.approved_test_projects)
 
         expected = brief["project"]
         config = data(run_json("config", "list"))

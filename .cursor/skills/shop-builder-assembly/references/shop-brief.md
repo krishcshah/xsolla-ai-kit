@@ -40,7 +40,25 @@ values, but must preserve `sources` so the user can see where decisions came fro
 Allowed presets: `auto`, `mobile-single-page`, `pc-multi-page`, and
 `live-service-events`. Allowed catalog group types: `virtual_good`, `bundle`, and
 `virtual_currency`. `project.environment` may be `sandbox` or `test`. For `test`, the
-brief must also contain `"test_project_acknowledged": true`.
+brief must also contain `"test_project_acknowledged": true`. Before a write,
+`preflight.py` and `apply_plan.py` additionally require a separate local allowlist:
+
+```json
+{
+  "version": 1,
+  "projects": [
+    {
+      "merchant_id": 12345,
+      "project_id": 67890,
+      "approved_by": "mentor or tech lead",
+      "approval_reference": "link or durable reference to the approval"
+    }
+  ]
+}
+```
+
+Keep the real allowlist outside the repository. This second artifact binds the exact
+project identity to approval evidence; a self-declared brief is not enough.
 
 ## Field behavior
 

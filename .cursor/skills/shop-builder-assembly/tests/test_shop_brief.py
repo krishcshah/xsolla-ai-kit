@@ -179,6 +179,66 @@ class ShopBriefTests(unittest.TestCase):
             ),
         )
 
+    def test_test_project_requires_separate_allowlist_record(self) -> None:
+        expected = {
+            "merchant_id": 100,
+            "project_id": 200,
+            "environment": "test",
+        }
+        with self.assertRaisesRegex(RuntimeError, "approved-test-projects"):
+            preflight.approved_test_project(None, expected)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "approved-test-projects.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "projects": [
+                            {
+                                "merchant_id": 100,
+                                "project_id": 200,
+                                "approved_by": "test mentor",
+                                "approval_reference": "test approval",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                "test approval",
+                preflight.approved_test_project(path, expected)[
+                    "approval_reference"
+                ],
+            )
+
+    def test_test_project_rejects_different_allowlisted_identity(self) -> None:
+        expected = {
+            "merchant_id": 100,
+            "project_id": 200,
+            "environment": "test",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "approved-test-projects.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "projects": [
+                            {
+                                "merchant_id": 100,
+                                "project_id": 201,
+                                "approved_by": "test mentor",
+                                "approval_reference": "test approval",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "not in the approved"):
+                preflight.approved_test_project(path, expected)
+
     def test_backup_resolves_wrapped_landing_id(self) -> None:
         self.assertEqual(
             "landing-id",

@@ -10,6 +10,8 @@ from a normalized JSON shop brief.
 - Sandbox IDs or an explicitly acknowledged dedicated test project configured
 - Existing catalog group IDs for any `newStore` sections
 - A dedicated test project; never use a partner live project
+- For a non-sandbox test project, a separate local approval allowlist containing the
+  exact merchant/project identity and the mentor or lead's approval reference
 
 ## Happy path
 
@@ -19,7 +21,8 @@ from a normalized JSON shop brief.
 
    ```bash
    python3 scripts/validate_shop_brief.py brief.json
-   python3 scripts/preflight.py brief.json
+   python3 scripts/preflight.py brief.json \
+     --approved-test-projects /path/to/approved-test-projects.json
    ```
 
 3. If the target exists, back it up before rendering or confirming a plan:
@@ -33,7 +36,9 @@ from a normalized JSON shop brief.
 
    ```bash
    python3 scripts/render_plan.py brief.json --structure ./backups/my-shop/structure.json
-   python3 scripts/apply_plan.py brief.json --confirmation-id <id> --backup-dir ./backups/my-shop
+   python3 scripts/apply_plan.py brief.json --confirmation-id <id> \
+     --backup-dir ./backups/my-shop \
+     --approved-test-projects /path/to/approved-test-projects.json
    ```
 
    For a new slug, render without `--structure` and confirm the bootstrap-only plan.
@@ -53,6 +58,9 @@ from a normalized JSON shop brief.
   recorded during the PR phase; it is not required to begin implementation testing.
 - Use `references/expert-review.md` to record the eventual review and its evidence.
 - Test project IDs are intentionally not stored in committed examples.
+- A `test` brief is insufficient on its own: preflight and apply also require a
+  separate, uncommitted allowlist record for the exact merchant/project IDs. Sandbox
+  briefs do not require this file.
 - The CLI does not currently expose an authoritative list of standard block modules.
 - Multi-command Shop Builder authentication, readiness verification, and CLI preview
   have confirmed defects captured in `references/test-findings.md`.
