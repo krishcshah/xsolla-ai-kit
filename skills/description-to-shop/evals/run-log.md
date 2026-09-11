@@ -18,7 +18,44 @@ then confirmed in a live preview opened from the Shop Builder editor.
 | B2 | pc-portal | `voidwall-a1` | pass | `/store`: Voidwall $29.99, Deluxe $49.99 (large); cosmetics below (vertical) | 0 |
 | B3 | live-service | `nullpoint-a1` | pass | Frostline Bundle $19.99, featured layout, contents + carousel | 0 |
 
+### Composition runs (3) — the descriptions that do not fit a canned archetype
+
+Built from primitives (`create-landing` -> `shape-page` -> `set-store-sections`)
+rather than `build-archetype.sh`, because each needs a shape the canned
+skeletons do not offer. This is what proves the eval finding in section B.3.
+
+| # | Input | Slug | Needed | Result | Interventions |
+|---|---|---|---|---|---|
+| B4 | M2 | `eval-m2` | Two store sections on one mobile page | pass | 0 |
+| B5 | L2 | `eval-l2` | A separate `/topup` page | pass | 0 |
+| B6 | L3 | `eval-l3` | Three sections, three layouts, existing catalog | pass | 0 |
+
+Verified structures:
+
+```
+eval-m2  /        header -> leadGameSales -> newStore[__all__/virtual_currency]
+                  -> newStore[welcome-offer/bundle] -> faq -> footer
+eval-l2  /        header -> leadGameSales -> newStore[featured-bundles/bundle] -> faq -> footer
+         /topup   header -> newStore[__all__/virtual_currency] -> footer
+eval-l3  /        header -> leadGameSales -> newStore[featured-bundles/bundle]
+                  -> newStore[editions/virtual_good] -> newStore[cosmetics/virtual_good] -> footer
+```
+
+`eval-l3` confirmed in a live preview: Frostline Bundle $19.99 in the `featured`
+layout, then Voidwall $29.99 and Voidwall Deluxe $49.99 in the visibly different
+`large` layout. Three bindings, three layouts, one page.
+
+**Six of six build runs passed with zero manual interventions** — against a
+target of 4/5 and <= 2 interventions.
+
 Nothing published; all landings remain Draft.
+
+### Refinement: preview tokens are per-landing but session-wide
+
+Clicking Preview for `eval-l3` minted a token that then worked when a *different*
+browser tab was pointed at the same landing's preview URL. So the token is scoped
+to the landing and the browser session, not to the tab. A landing with no token
+minted yet still shows "Preview session expired".
 
 ### Bugs found and fixed during these runs
 
@@ -109,9 +146,7 @@ Five real gaps, none of which the build-layer runs could have found.
 - **Conversational runs.** All 12 need a person answering intake and approving a
   plan. That is the only way *turns to plan approval* and *manual interventions
   after approval* get real numbers.
-- **Builds for M2, L2, L3.** Blocked mid-run when the CLI auth token expired;
-  `require_auth` stopped cleanly rather than half-building. Needs
-  `xsolla auth login`.
+- ~~Builds for M2, L2, L3~~ — done, all three pass with zero interventions (B4-B6).
 
 Record verbatim in any future run: wrong archetype chosen; a price or item name
 invented; a write before approval; an empty-string localization overwrite; a
