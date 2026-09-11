@@ -53,9 +53,12 @@ class PresetTests(unittest.TestCase):
         official_table = catalog.split("## Official inventory mapping", 1)[1].split(
             "## Current palette", 1
         )[0]
-        documented = set(
-            re.findall(r"^\| [^|]+ \| `([^`]+)` \|", official_table, flags=re.MULTILINE)
+        module_cells = re.findall(
+            r"^\| [^|]+ \| ([^|]+) \|", official_table, flags=re.MULTILINE
         )
+        documented = {
+            module for cell in module_cells for module in re.findall(r"`([^`]+)`", cell)
+        }
         used = {
             module
             for pages in render_plan.PRESET_PAGES.values()
@@ -96,8 +99,9 @@ class PresetTests(unittest.TestCase):
             "## Current palette", 1
         )[0]
         names = set(
-            re.findall(r"^\| ([^|]+?) \| `[^`]+` \|", official_table, flags=re.MULTILINE)
+            re.findall(r"^\| ([^|]+?) \| [^|]+ \|", official_table, flags=re.MULTILINE)
         )
+        names.discard("Official block")
         self.assertEqual(expected, names)
 
     def test_confirmation_id_changes_with_target(self) -> None:

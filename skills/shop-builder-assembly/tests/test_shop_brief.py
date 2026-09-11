@@ -56,6 +56,54 @@ class ShopBriefTests(unittest.TestCase):
                 self.assertEqual([], validator.validate(brief))
                 self.assertEqual(preset, render_plan.choose_preset(brief))
 
+    def test_exported_contract_modules_are_allowed_in_page_overrides(self) -> None:
+        brief = copy.deepcopy(self.brief)
+        brief["content"]["page_overrides"] = [
+            {
+                "name": "Events",
+                "path": "/events",
+                "blocks": [
+                    "header",
+                    "hero",
+                    "fast-login",
+                    "promoSlider",
+                    "promocodes",
+                    "rewards",
+                    "sb-offer-chain",
+                    "embed",
+                    "html",
+                    "social-quests",
+                    "news",
+                    "footer",
+                ],
+            }
+        ]
+        self.assertEqual([], validator.validate(brief))
+
+    def test_unmapped_subscription_module_is_rejected(self) -> None:
+        brief = copy.deepcopy(self.brief)
+        brief["content"]["page_overrides"] = [
+            {
+                "name": "Subscriptions",
+                "path": "/subscriptions",
+                "blocks": ["header", "subscriptions", "footer"],
+            }
+        ]
+        self.assertIn(
+            "content.page_overrides[0].blocks contains unverified modules: subscriptions",
+            validator.validate(brief),
+        )
+
+    def test_nested_sidebar_is_rejected_as_a_page_override(self) -> None:
+        brief = copy.deepcopy(self.brief)
+        brief["content"]["page_overrides"] = [
+            {"name": "Home", "path": "/", "blocks": ["sidebar"]}
+        ]
+        self.assertIn(
+            "content.page_overrides[0].blocks contains unverified modules: sidebar",
+            validator.validate(brief),
+        )
+
     def test_live_service_takes_priority(self) -> None:
         brief = copy.deepcopy(self.brief)
         brief["game"]["platforms"] = ["pc"]

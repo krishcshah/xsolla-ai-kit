@@ -89,6 +89,16 @@ def structure_data(value: object) -> dict:
     return value
 
 
+def effective_module(block: dict) -> object:
+    module = block.get("module")
+    values = block.get("values")
+    if module == "federated" and isinstance(values, dict):
+        block_id = values.get("blockId")
+        if isinstance(block_id, str) and block_id:
+            return block_id
+    return module
+
+
 def selected_pages(brief: dict, preset: str) -> list[dict]:
     overrides = brief.get("content", {}).get("page_overrides")
     return copy.deepcopy(overrides if overrides is not None else PRESET_PAGES[preset])
@@ -199,9 +209,9 @@ def bind_current_state(
             if omission["path"] == page_plan["path"]
         }
         current_modules = {
-            block.get("module")
+            effective_module(block)
             for block in blocks
-            if isinstance(block.get("module"), str)
+            if isinstance(effective_module(block), str)
         }
         preserved_modules = set(omitted_on_page) & current_modules
         if preserved_modules:
@@ -214,7 +224,7 @@ def bind_current_state(
         desired = page_plan["blocks"]
         for block in blocks:
             block_id = block.get("_id")
-            module = block.get("module")
+            module = effective_module(block)
             if not isinstance(block_id, str) or not isinstance(module, str):
                 raise ValueError(
                     "every current block must have string _id and module fields"

@@ -1,7 +1,8 @@
 # Shop Builder presets
 
-These are implementation drafts pending named SB Core/MIT reviewer approval. Treat
-them as defaults, not permission to overwrite explicit publisher choices.
+These are implementation drafts pending approval from the designated reviewer,
+Andrey Pyanzin. Treat them as defaults, not permission to overwrite explicit
+publisher choices.
 
 ## Mobile single page
 
@@ -51,6 +52,6 @@ unit. Do not invent event dates, discounts, scarcity, or eligibility.
 
 | Preset | Reviewer | Date | Status |
 |---|---|---|---|
-| Mobile single page | TBD | TBD | Draft |
-| PC multi-page portal | TBD | TBD | Draft |
-| Live service with bundles and events | TBD | TBD | Draft |
+| Mobile single page | Andrey Pyanzin | TBD | Draft; review pending |
+| PC multi-page portal | Andrey Pyanzin | TBD | Draft; review pending |
+| Live service with bundles and events | Andrey Pyanzin | TBD | Draft; review pending |

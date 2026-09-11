@@ -48,10 +48,11 @@ The official Blocks page is the authoritative product inventory, but the CLI doe
 expose a machine-readable mapping from those names to current template modules or
 their value contracts. The mapping in `block-catalog.md` therefore combines the
 official inventory, the live Add block palette, and sanitized UI-created exports.
-Subscriptions is absent from the observed palette; five palette entries are absent
-from the official page; and the older CLI guidance names `lead`/`federated` instead of
-the current `leadGameSales`/`fast-login` entries. Track these as linked gaps rather
-than guessing aliases.
+Subscriptions is absent from the observed palette, and five palette entries are absent
+from the official page. Current exports show that `lead` versus `leadGameSales` is
+landing-template-dependent and that `federated` is a runtime wrapper whose effective
+module is `values.blockId`. Preserve that wrapper and patch only exported leaf paths.
+Track remaining discrepancies as linked gaps rather than guessing aliases.
 
 - Inventory/UI reconciliation: [SB-8990](https://xsolla.atlassian.net/browse/SB-8990)
 - CLI module and contract discovery: [SB-8991](https://xsolla.atlassian.net/browse/SB-8991)

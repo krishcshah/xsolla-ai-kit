@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from render_plan import build_plan, canonical_hash
+from render_plan import build_plan, canonical_hash, effective_module
 from validate_shop_brief import VERIFIED_BLOCK_MODULES, load_brief, validate
 
 BACKUP_FILE_NAMES = {
@@ -165,7 +165,7 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
     ):
         raise RuntimeError("pages[].blocks must contain full block objects")
     for block in blocks:
-        module = block.get("module")
+        module = effective_module(block)
         if module in desired and module not in kept:
             kept.add(module)
         else:
@@ -177,11 +177,11 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
     unapproved = [
         block
         for block in removals
-        if approved_removals.get(block.get("_id")) != block.get("module")
+        if approved_removals.get(block.get("_id")) != effective_module(block)
     ]
     if unapproved:
         details = ", ".join(
-            f"{block.get('module')}:{block.get('_id')}" for block in unapproved
+            f"{effective_module(block)}:{block.get('_id')}" for block in unapproved
         )
         raise RuntimeError(
             "current page requires unconfirmed block removals; back up, re-render, "
@@ -205,7 +205,7 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
         raise RuntimeError(
             f"page disappeared during reconciliation: {page_plan['path']}"
         )
-    existing = [block.get("module") for block in page.get("blocks", [])]
+    existing = [effective_module(block) for block in page.get("blocks", [])]
     for module in desired:
         if module not in existing:
             run_json(
@@ -224,7 +224,7 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
         page = page_for_path(structure(slug), page_plan["path"])
         if page is None:
             raise RuntimeError(f"page disappeared during ordering: {page_plan['path']}")
-        modules = [block.get("module") for block in page.get("blocks", [])]
+        modules = [effective_module(block) for block in page.get("blocks", [])]
         source = modules.index(module)
         if source != destination:
             run_json(
@@ -243,7 +243,7 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
     final_page = page_for_path(structure(slug), page_plan["path"])
     if final_page is None:
         raise RuntimeError(f"could not read final page {page_plan['path']}")
-    final_modules = [block.get("module") for block in final_page.get("blocks", [])]
+    final_modules = [effective_module(block) for block in final_page.get("blocks", [])]
     if final_modules != desired:
         raise RuntimeError(
             f"block reconciliation failed for {page_plan['path']}: {final_modules}"

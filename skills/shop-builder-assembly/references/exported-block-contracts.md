@@ -1,12 +1,14 @@
 # Exported block contracts
 
-These are sanitized structural observations from the approved SB-8796 test project's
-UI-created `store` export on September 10, 2026. No IDs, localized copy, account data,
-or asset URLs are retained. Regenerate this summary with:
+These are sanitized structural observations from approved SB-8796 test-project
+exports: a UI-created `store` landing on September 10, 2026 and an unpublished,
+UI-created multi-page `topup` portal on September 11, 2026. No IDs, localized copy,
+account data, or asset URLs are retained. Regenerate a machine-readable summary with:
 
 ```bash
 python3 scripts/extract_block_contracts.py <ui-export.json> \
-  --source-label "approved test project; UI-created export; YYYY-MM-DD"
+  --source-label "approved test project; UI-created export; YYYY-MM-DD" \
+  --output references/exported-block-contracts-<landing-type>.json
 ```
 
 `blockValues` below means the exported block's top-level `values` object. It is an
@@ -30,10 +32,35 @@ The site-level `cart` object contains `enable:boolean`, `isRequiredAuth:boolean`
 `showPromocodeField:boolean`. Page and site theme source fields are documented in
 [cli-operations.md](cli-operations.md); computed theme fields are not patch inputs.
 
-## Required follow-up exports
+## Multi-page Web Portal contract lab
 
-Export one UI-created instance of each palette-only module before automating its value
-patches: `sidebar`, `hero`, `fast-login`, `news`, `promoSlider`, `promocodes`, `rewards`,
-`sb-offer-chain`, `embed`, `html`, and `social-quests`. Also resolve the missing
-Subscriptions module and the five palette-only documentation gaps in
-[block-catalog.md](block-catalog.md).
+The September 11 export covers every previously palette-only official module. The
+complete sanitized field/type inventory is committed as
+[`exported-block-contracts-topup.json`](exported-block-contracts-topup.json). The
+contract extractor resolves federated blocks by `values.blockId` and reports their
+package version without retaining host URLs or block IDs.
+
+| UI block | Effective module | Runtime transport | Version | Observed contract highlights |
+|---|---|---|---|---|
+| Sidebar | `sidebar` | native | field absent | `background`, `description`, `logo`, `menu`, `platforms`, `socials`, `storeButtonIds`, `storeButtons`, `title` |
+| Call-to-action | `hero` | native | field absent | `affiliate`, `background`, `description`, `enable`, `logo`, `template`, `title`; component action fields |
+| Fast Login | `fast-login` | native | field absent | background, deep-link, login-button, placeholder, script, title/description, and instruction-link objects |
+| News | `news` | native | 2 | categories, launcher ID, tabs, scroll/display flags, title, background, and view-more action |
+| Promo slider | `promoSlider` | native | field absent | description, enable, logo, slide arrow, loop configuration; slide component fields |
+| Promo codes | `promocodes` | native | 2 | background, description, placeholder, redeem button, script, and title |
+| Reward system | `rewards` | native | field absent | chains, script, and tabs |
+| Offer chain | `sb-offer-chain` | `federated` | package `0.12.4` | chain settings, nullable offer-chain ID, step settings, and translations |
+| Social media widgets | `embed` | native | field absent | background, enable, template, and title |
+| Custom code | `html` | native | 2 | CSS, enable, HTML, and JavaScript strings; the observed default is empty and hidden |
+| Social quests | `social-quests` | `federated` | package `5.0.0` | quest enable/order flags, URLs, translations, success/error modal fields, and media/dimension fields |
+
+The same export also proves that this Web Portal template uses `lead`, while the
+earlier store landing uses `leadGameSales`. It stores Offerwall, Daily rewards, Offer
+chain, and Social quests as `federated` wrappers whose effective identities are in
+`values.blockId`. Do not patch the wrapper wholesale.
+
+## Remaining contract gap
+
+Subscriptions is the only official inventory entry not observed in either the Add
+block palette or these exports. Do not guess its template or field paths; keep it
+blocked under [SB-8990](https://xsolla.atlassian.net/browse/SB-8990).

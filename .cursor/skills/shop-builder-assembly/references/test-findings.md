@@ -18,6 +18,23 @@ from committed evidence.
 - Captured `get-structure` output places full block objects in `pages[].blocks[]` and
   landing-level block IDs in the top-level `blocks[]` array. This shape is covered by
   a regression test because earlier draft documentation described it in reverse.
+- A second unpublished Web Portal template supplied six UI-created pages and exported
+  contracts for every previously palette-only official block: Sidebar, Call-to-action,
+  Fast Login, News, Promo slider, Promo codes, Reward system, Offer chain, Social media
+  widgets, Custom code, and Social quests.
+- The contract-lab run backed up before writes, stopped and rebound after the UI chose
+  a different target slug, obtained a second explicit confirmation, and then added
+  seven default blocks. Publisher Account reported every write saved. Custom code was
+  left empty, Offer chain stayed in its safe no-chain state, and the site was never
+  published.
+- The post-write export proves Offer chain and Social quests use the `federated`
+  transport with effective identities `sb-offer-chain` and `social-quests`. The
+  sanitizer now extracts their internal field/type contracts without retaining IDs,
+  content, or host URLs.
+- The authenticated Publisher Account preview rendered the unpublished Home page with
+  Fast Login, Promo slider, Call-to-action, Social media widgets, and Social quests.
+  Empty Custom code remained hidden and the unconfigured Offer chain produced no live
+  offer content, as expected. No publication action was taken.
 
 ## CLI gaps found
 

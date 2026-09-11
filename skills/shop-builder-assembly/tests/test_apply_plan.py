@@ -142,6 +142,37 @@ class ApplyPlanTests(unittest.TestCase):
                 apply_plan.reconcile_page("shop", "landing", plan)
             run_json.assert_not_called()
 
+    def test_reconciliation_preserves_federated_effective_module(self) -> None:
+        current = {
+            "_id": "landing",
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [
+                        {
+                            "_id": "offer-chain",
+                            "module": "federated",
+                            "values": {"blockId": "sb-offer-chain"},
+                        }
+                    ],
+                }
+            ],
+        }
+        plan = {
+            "name": "Home",
+            "path": "/",
+            "blocks": ["sb-offer-chain"],
+            "removals": [],
+        }
+        with (
+            mock.patch.object(apply_plan, "structure", return_value=current),
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.reconcile_page("shop", "landing", plan)
+        run_json.assert_not_called()
+        self.assertEqual(["sb-offer-chain"], result["blocks"])
+
     def test_run_preflight_propagates_failure(self) -> None:
         failed = mock.Mock(
             returncode=1, stderr="Preflight failed: wrong project", stdout=""
@@ -254,6 +285,36 @@ class ApplyPlanTests(unittest.TestCase):
         self.assertTrue(
             any("block order differs" in error for error in result["errors"])
         )
+
+    def test_structure_verifier_resolves_federated_effective_module(self) -> None:
+        plan = {
+            "target": {"merchant_id": 100, "project_id": 200, "slug": "shop"},
+            "locales": ["en-US"],
+            "pages": [{"path": "/", "blocks": ["sb-offer-chain"]}],
+        }
+        structure = {
+            "merchantId": 100,
+            "projectId": 200,
+            "domain": "shop",
+            "type": "store",
+            "published": None,
+            "languages": ["en-US"],
+            "pages": [
+                {
+                    "path": "/",
+                    "blocks": [
+                        {
+                            "_id": "offer-chain",
+                            "module": "federated",
+                            "values": {"blockId": "sb-offer-chain"},
+                        }
+                    ],
+                }
+            ],
+        }
+        result = verify_structure.verify(plan, structure)
+        self.assertTrue(result["ok"])
+        self.assertEqual(["sb-offer-chain"], result["pages"][0]["blocks"])
 
 
 if __name__ == "__main__":

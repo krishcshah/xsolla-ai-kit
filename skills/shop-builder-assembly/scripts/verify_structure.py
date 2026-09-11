@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from render_plan import structure_data
+from render_plan import effective_module, structure_data
 
 
 def load_object(path: Path, label: str) -> dict:
@@ -79,7 +79,7 @@ def verify(plan: dict, structure: object) -> dict:
             not isinstance(block, dict) for block in blocks
         ):
             raise ValueError(f"structure page {path} has an invalid blocks list")
-        actual_modules = [block.get("module") for block in blocks]
+        actual_modules = [effective_module(block) for block in blocks]
         expected_modules = page_plan.get("blocks")
         page_ok = actual_modules == expected_modules
         if not page_ok:
@@ -88,7 +88,7 @@ def verify(plan: dict, structure: object) -> dict:
                 f"got {actual_modules}"
             )
         actual_by_id = {
-            block.get("_id"): block.get("module")
+            block.get("_id"): effective_module(block)
             for block in blocks
             if isinstance(block.get("_id"), str)
         }
