@@ -44,10 +44,14 @@ project overrides after preflight.
 
 ## Known gaps to track
 
-The CLI does not expose an authoritative list of supported standard block module names
-or their required data/patch shapes. Do not build an apply script that guesses this
-contract. Validate the inventory with SB experts and file a linked CLI/API gap before
-claiming full catalog coverage.
+The official Blocks page is the authoritative product inventory, but the CLI does not
+expose a machine-readable mapping from those names to current template modules or
+their value contracts. The mapping in `block-catalog.md` therefore combines the
+official inventory, the live Add block palette, and sanitized UI-created exports.
+Subscriptions is absent from the observed palette; five palette entries are absent
+from the official page; and the older CLI guidance names `lead`/`federated` instead of
+the current `leadGameSales`/`fast-login` entries. Track these as linked gaps rather
+than guessing aliases.
 
 The first dedicated-project run also found defects in Publisher-session reuse,
 `verify-website`, and CLI preview authorization. See

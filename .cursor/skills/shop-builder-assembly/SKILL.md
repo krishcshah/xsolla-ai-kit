@@ -33,12 +33,15 @@ If `preset` is `auto`, choose in this order:
 3. Mobile-first or purchase-focused game → `mobile-single-page`.
 
 Read [references/presets.md](references/presets.md) before proposing pages or blocks.
-Read [references/block-catalog.md](references/block-catalog.md) when selecting blocks.
+Read [references/block-catalog.md](references/block-catalog.md) when selecting blocks;
+read [references/exported-block-contracts.md](references/exported-block-contracts.md)
+before patching block values.
 Read [references/cli-operations.md](references/cli-operations.md) before translating an
 approved plan into CLI operations.
 
-Treat the catalog and presets as provisional until the decisions in
-[references/expert-review.md](references/expert-review.md) contain reviewer evidence.
+The official catalog inventory is authoritative, but its template/contract mappings
+and the presets remain provisional until [references/expert-review.md](references/expert-review.md)
+contains reviewer approval evidence.
 
 ## Non-negotiable safety gate
 

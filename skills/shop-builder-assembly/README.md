@@ -59,6 +59,10 @@ from a normalized JSON shop brief.
 6. For formal runs, append the result using `references/evaluation.md` and check the
    metrics with `scripts/summarize_evals.py`.
 
+To sanitize the structural block contracts from a UI-created export without retaining
+IDs, copy, account data, or URLs, run `scripts/extract_block_contracts.py` and reconcile
+its output with `references/block-catalog.md`.
+
 ## Known limitations
 
 - Formal reviewer approval of the standard block inventory and three presets is
@@ -73,6 +77,10 @@ from a normalized JSON shop brief.
   have confirmed defects captured in `references/test-findings.md`.
 - The CLI has no page-deletion command. Application stops before writes when an
   existing target contains pages outside the confirmed plan.
+- The official block inventory is fully documented. Several current palette modules
+  still need UI-created exports before automated value patches are safe; Subscriptions
+  is documented but absent from the observed palette, while five palette entries are
+  absent from the official block page.
 - The current apply script implements and reports page/block structure and requested
   locale addition. `verify_structure.py` checks target identity, page paths, block
   order, retained/removal IDs, locales, and unpublished state. The workflow never

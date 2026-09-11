@@ -5,13 +5,14 @@ review in the PR or linked Jira issue; do not mark draft evidence as approval.
 
 ## Block catalog
 
-- Confirm the authoritative list of standard modules and whether `hero` and `lead`
-  are separate modules, aliases, or version-specific names.
+- Authoritative inventory confirmed as the Xsolla Web Shop Blocks documentation.
+- Confirm the 24 documentation-to-template mappings, especially the shared
+  `leadGameSales` mapping and the missing Subscriptions template.
 - For every module, confirm supported landing types, required data, safe patch paths,
   localization behavior, and catalog/auth dependencies.
 - Identify deprecated, internal-only, or template-only modules.
-- Confirm whether a CLI/API discovery operation exists. If none exists, approve filing
-  the gap described in `references/cli-operations.md`.
+- Review the five palette entries absent from the official inventory and the legacy
+  `lead`/`federated` names absent from the current palette.
 
 ## Presets
 

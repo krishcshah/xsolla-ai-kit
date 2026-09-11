@@ -50,7 +50,12 @@ class PresetTests(unittest.TestCase):
 
     def test_every_preset_module_is_in_the_catalog(self) -> None:
         catalog = (ROOT / "references" / "block-catalog.md").read_text(encoding="utf-8")
-        documented = set(re.findall(r"^\| `([^`]+)` \|", catalog, flags=re.MULTILINE))
+        official_table = catalog.split("## Official inventory mapping", 1)[1].split(
+            "## Current palette", 1
+        )[0]
+        documented = set(
+            re.findall(r"^\| [^|]+ \| `([^`]+)` \|", official_table, flags=re.MULTILINE)
+        )
         used = {
             module
             for pages in render_plan.PRESET_PAGES.values()
@@ -58,6 +63,42 @@ class PresetTests(unittest.TestCase):
             for module in page["blocks"]
         }
         self.assertEqual(set(), used - documented)
+
+    def test_catalog_covers_every_official_documented_block(self) -> None:
+        expected = {
+            "Header",
+            "Sidebar",
+            "Lead — Single game page",
+            "Lead — Web Shop",
+            "Call-to-action",
+            "Fast Login",
+            "Gallery",
+            "News",
+            "Cards",
+            "Promo slider",
+            "Description",
+            "Promo codes",
+            "Game editions",
+            "Store",
+            "Reward system",
+            "Offer chain",
+            "Social media widgets",
+            "FAQs",
+            "Custom code",
+            "Cart settings",
+            "System requirements",
+            "Subscriptions",
+            "Social quests",
+            "Footer",
+        }
+        catalog = (ROOT / "references" / "block-catalog.md").read_text(encoding="utf-8")
+        official_table = catalog.split("## Official inventory mapping", 1)[1].split(
+            "## Current palette", 1
+        )[0]
+        names = set(
+            re.findall(r"^\| ([^|]+?) \| `[^`]+` \|", official_table, flags=re.MULTILINE)
+        )
+        self.assertEqual(expected, names)
 
     def test_confirmation_id_changes_with_target(self) -> None:
         first = render_plan.build_plan(self.brief)["confirmation_id"]
