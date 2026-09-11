@@ -59,14 +59,6 @@ for p in json.load(sys.stdin)["data"].get("pages",[]):
 else: sys.exit("no page with path "+want)' "$2"
 }
 
-# block_count <slug> — total blocks across all pages, for verifying adds
-block_count() {
-  structure "$1" | python3 -c '
-import json,sys
-d=json.load(sys.stdin)["data"]
-print(sum(len(p.get("blocks",[])) for p in d.get("pages",[])))'
-}
-
 # require_auth — refuse to run against an expired session
 require_auth() {
   local s; s=$(env -u XSOLLA_API_KEY xsolla auth status 2>&1)
