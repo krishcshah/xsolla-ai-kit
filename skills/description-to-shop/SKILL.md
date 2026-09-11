@@ -38,7 +38,7 @@ Shop path (custom frontend, Store API, Checkout SDK) — that is `shop-setup`.
   binds to a group, so the groups decide the storefront's sections
 - No stale `XSOLLA_API_KEY` in the environment: an invalid one silently overrides a
   valid login and 401s every call
-- For a preview link: the merchant's licensing agreements must be signed
+- To *view* the result: a human clicks Preview in the editor — the CLI cannot mint the token
 
 ## The flow
 
@@ -84,7 +84,10 @@ Or drive the pieces directly: `create-landing.sh` → `shape-page.sh` → `bind-
 ```
 scripts/preview.sh <slug>
 ```
-Publishing is a human step in Publisher Account. Always say so.
+The CLI **cannot** mint a preview token — `preview-link` 403s for publisher logins. The
+script prints the editor URL and the built structure; a human clicks **Preview** there to
+view it. Say this plainly rather than implying a link is coming. Publishing is a separate
+human step, and no CLI command for it exists.
 
 ## Archetypes
 
@@ -109,8 +112,9 @@ Groups are arguments, not constants — pass the user's real catalog groups.
 6. **Test projects only.** Never a partner's live project.
 7. **Use `xsolla auth login`.** If a manual `XSOLLA_SHOPBUILDER_SESSION` copy is ever
    needed, document it and file a ticket — do not work around it in code.
-8. **Never sign licensing agreements.** They gate preview, and accepting them is a legal
-   act for a person in Publisher Account.
+8. **Never accept licensing agreements.** Accepting terms is a legal act for a person in
+   Publisher Account. (They do not gate preview — that was our earlier assumption and it
+   was wrong.)
 9. **Use the scripts.** They encode the API's real behaviour — throttling, the prepend
    bug, silent write failures. Ad-hoc calls will get these wrong.
 

@@ -189,33 +189,62 @@ each against `get-structure`.
 
 ## Catalog binding — how a store block reaches the catalog
 
-There is no command for this. The binding lives inside the `newStore` block's
-`components[]`, and is reached with an `update-block` patch:
+Verified end to end: built by CLI, confirmed rendering real priced items in a
+live preview.
+
+There is no command for this. The binding lives in the `newStore` block's
+`components[]` and is written with an `update-block` patch.
+
+### A store block has FOUR sections by default, not one
+
+A freshly added `newStore` block ships with four `newStoreSection` components,
+pre-pointed at whatever the project already has. Patching `components[0]` leaves
+three stale sections rendering junk — and a verification that re-reads
+`components[0]` passes anyway, because it checks exactly what it just wrote.
+
+`scripts/set-store-sections.sh` replaces the whole `components` array and
+verifies every section.
+
+### The item type strings
+
+A section binds to an item **group** and an item **type** — never item IDs:
 
 ```json
-"components": [{
-  "type": "newStoreSection",
-  "section": {
-    "item": { "autoSelected": false, "group": "welcome-offer", "type": "bundle" },
-    "title": { "enable": false, "id": "L:<localizationId>" },
-    "hiddenEmpty": true, "horizontalScroll": false
-  },
-  "card": { "selectedLayoutType": "featured", "layouts": { ... } }
-}]
+"section": { "item": { "autoSelected": false, "group": "welcome-offer", "type": "bundle" } }
 ```
 
-**A store block binds to an item _group_ and an item _type_ — not to item IDs.**
+Only four type values work. **The API stores anything else verbatim — no error,
+no coercion** — and the storefront then matches nothing and renders loading
+skeletons forever:
 
-This is the single most important structural fact for the skill:
+| Value | Editor label | Notes |
+|---|---|---|
+| `virtual_good` | Virtual items | **Not** `virtual_item` |
+| `virtual_currency` | Virtual currency | Currency packages. Use group `__all__` |
+| `bundle` | Bundles | |
+| `game_key` | Game keys | Inferred from the editor; not yet exercised |
 
-- The **catalog's group structure determines the storefront's section structure.**
-  One `newStoreSection` per group. Seeding the catalog is therefore a design step,
-  not throwaway setup.
-- Intake must collect item **groups**, not just a flat item list.
-- `card.selectedLayoutType` picks the card design. Available layouts, read from a live
-  block: `featured`, `vertical`, `horizontal`, `large`, `bundle_vertical`,
-  `game-keys-vertical`. Each carries its own `alignment`, `image.format`, `image.size`,
-  `itemsDescriptionEnabled` and `priceInButton`.
+There is no `virtual_currency_package`. We wrote one, the API accepted it, and
+the shop silently rendered nothing.
+
+`group` is a catalog group's `external_id`, or the sentinel `__all__`.
+
+### Card layouts
+
+`card.selectedLayoutType`, one of: `featured`, `vertical`, `horizontal`, `large`,
+`bundle_vertical`, `game-keys-vertical`.
+
+### The group structure is the storefront structure
+
+One section per group, so seeding the catalog is a design step. Intake collects
+groups, not a flat item list.
+
+### Bundles need unhiding
+
+`admin-create-bundles` has no `--is-show-in-store` flag. If a bundle does not
+appear, `admin-unhide-bundle --bundle-sku <sku>` is the fix. (In our run the
+bundles already had `is_show_in_store: true`, so this was not the cause — but
+the command exists for a reason.)
 
 ## Theme
 
@@ -249,7 +278,7 @@ falls short, file a ticket — do not work around it in code.
 
 ## Behaviour you only find by running it
 
-Four things that are not in any help text and will break a naive script.
+Five things that are not in any help text and will break a naive script.
 
 ### 1. `add-block` prepends; its help says it appends
 
@@ -283,15 +312,26 @@ Consequences for any script here:
 
 `scripts/shape-page.sh` does all three, including one slower repair pass.
 
-### 4. Preview is gated on merchant licensing agreements
+### 4. The CLI cannot mint a preview token
 
-`enable-preview` and `preview-link` return **403**, and `verify-website` **400**,
-until the merchant's agreements are signed. `list-agreements --merchant-id <id>`
-shows the state; both a `payment` and a `product` agreement must be signed.
+`enable-preview` and `preview-link` return **403** on a publisher login, and
+`verify-website` returns **400**.
 
-Signing is a legal acceptance performed by a person in Publisher Account. No
-script should do it. `scripts/preview.sh` detects the unsigned state and says so
-rather than returning a bare 403.
+This is *not* about licensing agreements. Previews work perfectly well with the
+merchant's `payment` and `product` agreements unsigned — verified. The editor's
+Preview button mints a short-lived, **per-landing, browser-session-scoped**
+token, and the CLI has no equivalent. Opening a preview URL minted for one
+landing while pointed at another gives "Preview session expired".
+
+So the honest end of an automated build is: built and verified by CLI, viewed by
+a human clicking Preview in the editor. `scripts/preview.sh` says exactly that
+and prints the built structure so a run is checkable without a browser.
+
+### 5. The editor canvas lies about empty store sections
+
+The canvas can show "No items found. You can add items here." for a store
+section that renders correctly in the live preview. Verify against the preview
+or `get-structure`, never the canvas.
 
 ---
 
@@ -332,7 +372,15 @@ spec work on the Shop Builder team comes in.
     correctly says "required flag not set"; `admin-create-currency-package` and
     `admin-create-bundles` return `Unprocessable Entity` instead. Same root cause,
     two error styles.
-12. **`config set` writes to an environment.** Setting `project-id` landed in a `dev`
+12. **Invalid store-section item types are stored verbatim** — *high*. Writing
+    `type: "virtual_currency_package"` (not a real value) returns success, persists,
+    and the storefront then renders loading skeletons forever. No validation, no error.
+13. **A new `newStore` block ships with four pre-filled sections.** Undocumented, so a
+    caller patching `components[0]` silently leaves three stale sections live.
+14. **`enable-preview` / `preview-link` 403 for publisher logins.** The editor can mint a
+    preview token but the CLI cannot, so an automated build can never produce a viewable
+    link. This is the single biggest gap for agent-driven Shop Builder work.
+15. **`config set` writes to an environment.** Setting `project-id` landed in a `dev`
     environment whose `merchant-id` was `0`, silently changing the active merchant.
 
 ---

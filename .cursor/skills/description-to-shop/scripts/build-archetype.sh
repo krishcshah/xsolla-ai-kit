@@ -13,10 +13,13 @@
 # a minute or two; that is the API's pace, not wasted time.
 #
 # Usage: ./build-archetype.sh <mobile|pc-portal|live-service> <slug> <name> [group=type:layout ...]
+# Item type must be one of virtual_good, virtual_currency, bundle, game_key.
+# Anything else is stored verbatim and renders nothing — see set-store-sections.sh.
+#
 #   defaults if no groups given:
-#     mobile        currency-packs=virtual_currency_package:vertical
-#     pc-portal     editions=virtual_item:large  cosmetics=virtual_item:vertical
-#     live-service  featured-bundles=bundle:featured  currency-packs=virtual_currency_package:horizontal
+#     mobile        __all__=virtual_currency:vertical
+#     pc-portal     editions=virtual_good:large  cosmetics=virtual_good:vertical
+#     live-service  featured-bundles=bundle:featured  __all__=virtual_currency:horizontal
 source "$(dirname "$0")/lib.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
@@ -27,9 +30,9 @@ shift 3 || true
 BINDINGS=("$@")
 
 case "$ARCH" in
-  mobile)       [ ${#BINDINGS[@]} -gt 0 ] || BINDINGS=(currency-packs=virtual_currency_package:vertical) ;;
-  pc-portal)    [ ${#BINDINGS[@]} -gt 0 ] || BINDINGS=(editions=virtual_item:large cosmetics=virtual_item:vertical) ;;
-  live-service) [ ${#BINDINGS[@]} -gt 0 ] || BINDINGS=(featured-bundles=bundle:featured currency-packs=virtual_currency_package:horizontal) ;;
+  mobile)       [ ${#BINDINGS[@]} -gt 0 ] || BINDINGS=(__all__=virtual_currency:vertical) ;;
+  pc-portal)    [ ${#BINDINGS[@]} -gt 0 ] || BINDINGS=(editions=virtual_good:large cosmetics=virtual_good:vertical) ;;
+  live-service) [ ${#BINDINGS[@]} -gt 0 ] || BINDINGS=(featured-bundles=bundle:featured __all__=virtual_currency:horizontal) ;;
   *) die "unknown archetype '$ARCH' (mobile | pc-portal | live-service)" ;;
 esac
 require_auth
@@ -77,10 +80,8 @@ n=0
 for bid in "${STORE_BLOCKS[@]}"; do
   spec="${BINDINGS[$n]:-}"
   if [ -z "$spec" ]; then echo "  ! store block $bid left unbound (no binding given)"; n=$((n+1)); continue; fi
-  group="${spec%%=*}"; rest="${spec#*=}"; itype="${rest%%:*}"; layout="${rest#*:}"
-  [ "$layout" = "$rest" ] && layout=featured
-  sleep 2
-  "$HERE/bind-store-section.sh" "$SLUG" "$bid" "$group" "$itype" "$layout" || die "binding failed"
+  sleep 3
+  "$HERE/set-store-sections.sh" "$SLUG" "$bid" "$spec" || die "binding failed"
   n=$((n+1))
 done
 

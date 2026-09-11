@@ -46,16 +46,22 @@ throttled and the scripts pace themselves deliberately.
 
 ## Known limitations
 
-- **Preview needs signed licensing agreements.** Until the merchant's `payment`
-  and `product` agreements are signed in Publisher Account, `enable-preview` and
-  `preview-link` return 403 and `verify-website` returns 400. Signing is a legal
-  act for a person; no script does it. Check with
-  `xsolla shopbuilder list-agreements --merchant-id <m>`.
+- **The CLI cannot produce a preview link.** `enable-preview` and `preview-link`
+  return 403 on a publisher login. This is *not* about licensing agreements —
+  previews work with them unsigned. The editor mints a short-lived, per-landing,
+  browser-session token that the CLI has no equivalent for. A build therefore
+  ends with "built and verified"; a human clicks **Preview** in the editor to
+  look at it. `scripts/preview.sh` prints the editor URL and the built structure.
+- **The editor canvas can show "No items found"** for a store section that
+  renders fine in the live preview. Trust the preview, not the canvas.
 - **The skill never publishes.** There is no publish command in the CLI at all.
   The deliverable is a preview link.
 - **Standard blocks only.** 15 modules, listed in `references/cli-commands.md`.
   Custom/AI blocks are deliberately out of scope.
 - **The skill never creates catalog entities.** It reads an existing catalog.
+- **Only four store item types exist**: `virtual_good`, `virtual_currency`,
+  `bundle`, `game_key`. Anything else is accepted by the API and silently
+  renders nothing. `set-store-sections.sh` validates before writing.
 - **Block templates are not discoverable.** No enumeration endpoint; an invalid
   name returns a bare HTTP 500. The catalog in the reference was brute-forced and
   may be incomplete, and may differ by landing type.

@@ -20,9 +20,17 @@ conversation and are the outstanding work for this ticket.
 | B2 | pc-portal | `voidwall-a1` | pass | `/` → header · leadGameSales · description · gallery · footer<br>`/store` → header · newStore[editions] · newStore[cosmetics] · footer<br>`/support` → header · faq · requirements · footer | 0 | Three pages, two bound store sections |
 | B3 | live-service | `nullpoint-a1` | pass | `/` → header · leadGameSales · newStore[featured-bundles] · newStore[currency-packs] · faq · footer | 0 | Two store sections on one page |
 
-All three stopped at the same place: **preview unavailable**, because the
-merchant's licensing agreements are unsigned. The shops are built and inspectable;
-there is no link to hand over.
+All three were then **visually confirmed in a live preview**, opened by clicking
+Preview in the Shop Builder editor (the CLI cannot mint a preview token):
+
+- **B1 mobile** — 100/550/1200 Shards at $0.99/$4.99/$9.99, plus Ember Skin,
+  Frostline Skin and Wave Emote priced at 450/450/150 Shards, then the FAQ.
+- **B2 pc-portal** — `/store` shows Voidwall $29.99 and Voidwall Deluxe $49.99 in
+  the large layout, cosmetics below in the vertical layout.
+- **B3 live-service** — Frostline Bundle $19.99 in the featured layout with its
+  three contents and a carousel across the bundle group.
+
+Nothing was published; all eight landings remain Draft.
 
 ### Failures found and fixed during these runs
 
@@ -34,6 +42,10 @@ Worth keeping — each one would have silently corrupted a build:
 | Page ended up empty, no error | Unpaced write burst is throttled and silently dropped | Pace writes, verify, one slower repair pass |
 | `structure` returned nothing mid-script | `head -c1` in a pipeline + `pipefail` turned SIGPIPE into failure | Substring test instead of a pipeline |
 | Store blocks never bound | `… \| while read` runs in a subshell; the array was discarded | Process substitution |
+| Store rendered empty skeletons forever | Item type `virtual_currency_package` is not a real value; the API stored it verbatim | Validate against the four real types before writing |
+| Three stale store sections left live | A new `newStore` block has four sections; we patched only `components[0]` | Replace the whole `components` array |
+| Binding "verified" while broken | The check re-read the same path it had just written | Verify every section, and confirm in a live preview |
+| `python3 -` got no JSON | The heredoc and the piped data both wanted stdin | Pass the structure by file path |
 | Seed script reported everything as failed on re-run | Classified on exit code, and "already exists" wording differs per entity | Classify on output, treat "exists" as success |
 
 ## Outstanding
