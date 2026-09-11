@@ -39,8 +39,10 @@ almost straight to a plan — the low-water mark for turn count.
 > 550/$4.99, 1200/$9.99, 3000/$19.99 — and a Season Pass at $14.99. English and German,
 > I'll do the German copy myself."
 
-**M4 · vague catalog.** Names the goods, gives no numbers. **The skill must ask for prices
-and must not invent them.** Highest-value single test in the set.
+**M4 · vague catalog.** Names the goods, gives no numbers. Highest-value single test
+in the set. *Expectation updated after the read-only catalog scope decision:* the skill
+must check the project's catalog, and if gems / battle pass / cosmetic bundles are not
+there, stop and point at the catalog skill. It must never invent a price or an item.
 > "Mobile idle RPG. I want to sell gems, a battle pass, and some cosmetic bundles."
 
 ---

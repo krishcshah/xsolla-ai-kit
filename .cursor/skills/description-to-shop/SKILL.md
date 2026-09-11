@@ -73,11 +73,18 @@ state — record it, don't skip silently.
 
 ### 6. Build
 
+Build from the **approved plan**, by composing the primitives:
+
 ```
-scripts/build-archetype.sh <mobile|pc-portal|live-service> <slug> <name> [group=type:layout ...]
+scripts/create-landing.sh     <slug> <name> <type>
+scripts/shape-page.sh         <slug> <page-path> <block>...
+scripts/set-store-sections.sh <slug> <block-id> <group=type:layout>...
 ```
 
-Or drive the pieces directly: `create-landing.sh` → `shape-page.sh` → `bind-store-section.sh`.
+`scripts/build-archetype.sh` is a convenience for the three canonical shapes only.
+In eval, 6 of 12 realistic descriptions did **not** fit a canned skeleton — extra
+pages, extra store sections, or requests with no matching block. Treat the
+archetype as a starting layout, not a constraint, and compose when the plan differs.
 
 ### 7. Hand over the preview
 
@@ -97,7 +104,13 @@ human step, and no CLI command for it exists.
 | `pc-portal` | Home / Store / Support | `editions` large, `cosmetics` vertical |
 | `live-service` | One page, two store sections | `featured-bundles` featured, `currency-packs` horizontal |
 
-Groups are arguments, not constants — pass the user's real catalog groups.
+Groups are arguments, not constants — read the real ones with
+`scripts/list-catalog-groups.sh` and pass those. The archetype fixes the page and
+block skeleton only; anything else in the plan is built from the primitives above.
+
+Things the standard blocks cannot do, which belong in the plan's "Not included":
+a roadmap page, and any bundle that rotates on a schedule — there is no
+scheduling anywhere in Shop Builder's standard blocks.
 
 ## Hard rules
 
@@ -131,5 +144,5 @@ user can inspect beats a silent partial rollback they cannot.
 | [`references/intake-schema.md`](references/intake-schema.md) | Every field, required vs optional, defaults, completeness gate |
 | [`references/plan-format.md`](references/plan-format.md) | Plan template, approval rules, build order |
 | [`references/cli-commands.md`](references/cli-commands.md) | All 43 commands, the verified block catalog, catalog binding, and the four behaviours that only show up at runtime |
-| [`scripts/`](scripts/) | `lib.sh`, `backup-landing.sh`, `create-landing.sh`, `shape-page.sh`, `bind-store-section.sh`, `build-archetype.sh`, `preview.sh`, `seed-test-catalog.sh` |
+| [`scripts/`](scripts/) | `lib.sh`, `list-catalog-groups.sh`, `backup-landing.sh`, `create-landing.sh`, `shape-page.sh`, `set-store-sections.sh`, `build-archetype.sh`, `preview.sh`, `seed-test-catalog.sh` |
 | [`evals/`](evals/) | Twelve eval inputs, run log |

@@ -38,6 +38,30 @@ esac
 require_auth
 
 echo "== $ARCH -> $SLUG =="
+
+# Safety rule 1: back up before the first write. A project with no landings is a
+# valid state, not a reason to skip — record it. Set SKIP_BACKUP=1 only for
+# throwaway probes.
+if [ "${SKIP_BACKUP:-0}" != "1" ]; then
+  EXISTING=$(sb list-websites $IDS --json 2>/dev/null | python3 -c '
+import json,sys
+try: print(len(json.load(sys.stdin).get("data") or []))
+except Exception: print(0)')
+  if [ "${EXISTING:-0}" -gt 0 ]; then
+    echo "  backing up $EXISTING existing landing(s) before first write"
+    for s in $(sb list-websites $IDS --json 2>/dev/null | python3 -c '
+import json,sys
+for x in (json.load(sys.stdin).get("data") or []): print(x.get("domain",""))'); do
+      [ -n "$s" ] || continue
+      "$HERE/backup-landing.sh" "$s" "${BACKUP_DIR:-./backups}" >/dev/null 2>&1 \
+        && echo "    + $s" || echo "    ! $s (backup failed)"
+      sleep 2
+    done
+  else
+    echo "  no existing landings in project $XSOLLA_PROJECT_ID — nothing to back up"
+  fi
+fi
+
 "$HERE/create-landing.sh" "$SLUG" "$NAME" store >/dev/null || die "could not create landing"
 echo "  + landing created (type store)"
 

@@ -89,6 +89,25 @@ items only as their contents.
 | `featured_group` | ⬜ | ✅ | first group | Gets the `featured` card layout. |
 | `real_currency` | ⬜ | ✕ | read from catalog | Display only — the catalog owns the real value. |
 
+### Translating a description into groups
+
+Every eval description except one names **items and prices**, never groups. The
+block binds to a group. So intake always has a translation step, and it comes
+before the plan:
+
+1. Run `scripts/list-catalog-groups.sh` to read the real groups, what each holds,
+   and a suggested item type per group.
+2. Map what the user described onto those groups. "Three coin packs and a starter
+   bundle" is two sections, not four items.
+3. Anything the user named that has no group is **Missing** — ask, or say the
+   catalog needs seeding first. Never invent a group and never invent contents.
+
+**Currency packages are the exception and cannot be grouped.** They bind as
+`virtual_currency` with the sentinel group `__all__`, so every currency package
+in the project appears in that one section. A request for two separately-grouped
+currency sections cannot be honoured — say so in the plan rather than building
+something that silently shows the wrong thing.
+
 ### What intake must not do
 
 - **Never invent prices, item names or currency codes.** They are read from the catalog.

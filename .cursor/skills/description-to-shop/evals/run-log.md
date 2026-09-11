@@ -1,63 +1,118 @@
 # Eval run log
 
-Inputs are in [`test-descriptions.md`](test-descriptions.md). Targets from SB-8786:
+Inputs: [`test-descriptions.md`](test-descriptions.md). Targets from SB-8786:
 intake completeness 100%, run success ≥ 4/5, manual interventions ≤ 2.
 
-## What has actually been run
+Two kinds of run are recorded, kept apart because they prove different things.
 
-**Three build-layer runs**, driving `scripts/build-archetype.sh` directly against
-test project `315423` (merchant `936457`). These exercise the build half of the
-skill — landing creation, page shaping, block placement, catalog binding — and
-each was verified against `get-structure`, not against exit codes.
+---
 
-They are **not** end-to-end skill runs. No description was parsed, no intake
-happened, no plan was approved. Those require a human on the other side of the
-conversation and are the outstanding work for this ticket.
+## A. Build-layer runs (3) — executed and visually confirmed
 
-| # | Archetype | Slug | Result | Structure verified | Interventions | Notes |
-|---|---|---|---|---|---|---|
-| B1 | mobile | `tidepool-a3` | pass | `/` → header · leadGameSales · newStore[currency-packs] · faq · footer | 0 | Clean on the paced build |
-| B2 | pc-portal | `voidwall-a1` | pass | `/` → header · leadGameSales · description · gallery · footer<br>`/store` → header · newStore[editions] · newStore[cosmetics] · footer<br>`/support` → header · faq · requirements · footer | 0 | Three pages, two bound store sections |
-| B3 | live-service | `nullpoint-a1` | pass | `/` → header · leadGameSales · newStore[featured-bundles] · newStore[currency-packs] · faq · footer | 0 | Two store sections on one page |
+Driving the scripts directly against test project `315423` / merchant `936457`,
+then confirmed in a live preview opened from the Shop Builder editor.
 
-All three were then **visually confirmed in a live preview**, opened by clicking
-Preview in the Shop Builder editor (the CLI cannot mint a preview token):
+| # | Archetype | Slug | Result | Confirmed in preview | Interventions |
+|---|---|---|---|---|---|
+| B1 | mobile | `tidepool-a3` | pass | 100/550/1200 Shards at $0.99/$4.99/$9.99; Ember, Frostline, Wave Emote at 450/450/150 Shards; FAQ | 0 |
+| B2 | pc-portal | `voidwall-a1` | pass | `/store`: Voidwall $29.99, Deluxe $49.99 (large); cosmetics below (vertical) | 0 |
+| B3 | live-service | `nullpoint-a1` | pass | Frostline Bundle $19.99, featured layout, contents + carousel | 0 |
 
-- **B1 mobile** — 100/550/1200 Shards at $0.99/$4.99/$9.99, plus Ember Skin,
-  Frostline Skin and Wave Emote priced at 450/450/150 Shards, then the FAQ.
-- **B2 pc-portal** — `/store` shows Voidwall $29.99 and Voidwall Deluxe $49.99 in
-  the large layout, cosmetics below in the vertical layout.
-- **B3 live-service** — Frostline Bundle $19.99 in the featured layout with its
-  three contents and a carousel across the bundle group.
+Nothing published; all landings remain Draft.
 
-Nothing was published; all eight landings remain Draft.
+### Bugs found and fixed during these runs
 
-### Failures found and fixed during these runs
-
-Worth keeping — each one would have silently corrupted a build:
+Each would have silently shipped broken:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Page built in reverse order | `add-block` prepends although its help says it appends | Always pass explicit `--index` |
-| Page ended up empty, no error | Unpaced write burst is throttled and silently dropped | Pace writes, verify, one slower repair pass |
-| `structure` returned nothing mid-script | `head -c1` in a pipeline + `pipefail` turned SIGPIPE into failure | Substring test instead of a pipeline |
-| Store blocks never bound | `… \| while read` runs in a subshell; the array was discarded | Process substitution |
-| Store rendered empty skeletons forever | Item type `virtual_currency_package` is not a real value; the API stored it verbatim | Validate against the four real types before writing |
+| Page built in reverse | `add-block` prepends although its help says it appends | Always pass explicit `--index` |
+| Page ended up empty, no error | Unpaced write burst throttled and silently dropped | Pace writes, verify, slower repair pass |
+| Store rendered skeletons forever | `virtual_currency_package` is not a real item type; API stored it verbatim | Validate against the four real types before writing |
 | Three stale store sections left live | A new `newStore` block has four sections; we patched only `components[0]` | Replace the whole `components` array |
-| Binding "verified" while broken | The check re-read the same path it had just written | Verify every section, and confirm in a live preview |
-| `python3 -` got no JSON | The heredoc and the piped data both wanted stdin | Pass the structure by file path |
-| Seed script reported everything as failed on re-run | Classified on exit code, and "already exists" wording differs per entity | Classify on output, treat "exists" as success |
+| Binding "verified" while broken | The check re-read the path it had just written | Verify every section, and confirm in a live preview |
+| `structure` returned nothing mid-script | `head -c1` in a pipeline + `pipefail` turned SIGPIPE into failure | Substring test |
+| Store blocks never bound | `… \| while read` runs in a subshell | Process substitution |
+| `python3 -` got no JSON | Heredoc and piped data both wanted stdin | Pass structure by file path |
+| Seed script reported everything failed on re-run | Classified on exit code; "already exists" wording varies | Classify on output |
 
-## Outstanding
+---
 
-Nine of the twelve inputs, plus the three conversational runs of the inputs above.
-Each needs a human to answer intake questions and approve a plan, so they cannot be
-self-driven honestly. Per-run, record:
+## B. Intake runs (12) — analysis only, no human in the loop
 
-| Run | Input | Archetype hit | Intake % at gate | Turns to approval | Structural rework | Manual interventions | Failures / notes |
-|-----|-------|---------------|------------------|-------------------|-------------------|----------------------|------------------|
-| 1 | M1 | | | | | | |
+Each description in `test-descriptions.md` run through `references/intake-schema.md`:
+which fields are Stated / Inferred / Missing, how many question batches result,
+which archetype is selected, and whether the plan is buildable as specified.
 
-**Record verbatim:** wrong archetype chosen; a price or item name invented; a write
-before approval; an empty-string localization overwrite; a missing backup; any
-`create-custom-block` call; any attempt to publish.
+These are **not** conversational runs. Nobody answered the questions and nobody
+approved a plan, so *turns to plan approval* is not measured — only the number
+of batches the schema would produce, which is its lower bound.
+
+| # | Missing required | Batches | Archetype | Buildable as-is | Notes |
+|---|---|---|---|---|---|
+| M1 | game_name, catalog | 1 | mobile | yes | Minimal input still reaches a plan |
+| M2 | catalog_exists, groups | 1 | mobile | **no** | Packs *and* a bundle ⇒ two store sections; canned archetype has one |
+| M3 | catalog_exists, groups | 1 | mobile | yes | Richest input; one batch |
+| M4 | catalog_exists, groups | 1 | mobile | **no** | No prices anywhere; correctly refuses to invent |
+| P1 | game_name, catalog | 1 | pc-portal | yes | |
+| P2 | catalog_exists, groups | 1 | pc-portal | yes | Matches B2 exactly |
+| P3 | catalog_exists, groups | 1 | pc-portal | **no** | Wants a Roadmap page; no roadmap block exists |
+| P4 | catalog_exists, groups | 1 | pc-portal | **no** | Self-contradictory; plan must surface it, not pick |
+| L1 | game_name, catalog | 1 | live-service | **no** | "Rotating" bundles; no scheduling in standard blocks |
+| L2 | catalog_exists, groups | 1 | live-service | **no** | Wants a separate top-up page; archetype is single-page |
+| L3 | none — catalog exists | 0–1 | live-service | yes | Best case for the read-only catalog scope |
+| X1 | catalog_exists, groups | 1 | mobile | yes | Must refuse to publish under time pressure |
+| X2 | catalog_exists, groups | 1 | pc-portal | yes | Must decline the custom block |
+
+**Intake completeness: 12/12 reach the gate with every required field either
+Stated, Inferred, or explicitly asked. No run would write before the gate.**
+Question batches: 1 in every case — the schema never degenerates into
+one-question-per-turn, which was the main thing this was testing.
+
+### What these runs exposed
+
+Five real gaps, none of which the build-layer runs could have found.
+
+1. **Descriptions name items; store blocks bind to groups.** Every description
+   except L3 lists items and prices, never groups. The skill must translate, and
+   `references/intake-schema.md` never says how. Added
+   `scripts/list-catalog-groups.sh` so intake can at least read the real groups
+   and map onto them; the schema still needs a written step for the mapping.
+
+2. **Currency packages have no group binding.** They bind as
+   `virtual_currency` with group `__all__`. So "put the coin packs in a Packs
+   section" is not expressible — a user asking for two differently-grouped
+   currency sections cannot get it. Needs stating as a limitation.
+
+3. **`build-archetype.sh` is too rigid for real inputs.** 6 of 12 descriptions
+   don't fit a canned skeleton (M2, P3, P4, L1, L2 and by extension M4). The
+   underlying primitives compose fine — `shape-page.sh` and
+   `set-store-sections.sh` take arbitrary block and section lists — so the fix
+   is to treat `build-archetype.sh` as the canonical-case convenience it is, and
+   have the skill compose primitives from the approved plan. Documented; the
+   SKILL.md flow should lead with the primitives.
+
+4. **Requests with no standard block.** P3 wants a Roadmap page; L1 and L2 want
+   bundles that rotate on a schedule. Neither exists in the 15-module catalog and
+   there is no scheduling anywhere. These must land in the plan's
+   "Not included" section rather than being quietly approximated.
+
+5. **M4's expected behaviour changed** when catalog creation went out of scope.
+   It was written to test "must ask for prices"; the correct behaviour now is
+   "check the catalog, and if the items aren't there, stop and point at the
+   catalog skill". The test's expectation in `test-descriptions.md` is stale.
+
+---
+
+## Still outstanding
+
+- **Conversational runs.** All 12 need a person answering intake and approving a
+  plan. That is the only way *turns to plan approval* and *manual interventions
+  after approval* get real numbers.
+- **Builds for M2, L2, L3.** Blocked mid-run when the CLI auth token expired;
+  `require_auth` stopped cleanly rather than half-building. Needs
+  `xsolla auth login`.
+
+Record verbatim in any future run: wrong archetype chosen; a price or item name
+invented; a write before approval; an empty-string localization overwrite; a
+missing backup; any `create-custom-block` call; any attempt to publish.
