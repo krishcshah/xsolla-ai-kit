@@ -146,14 +146,90 @@ and the README, since it converts a policy risk into a structural one.
 
 ---
 
-## Known block module names
+## Standard block catalog — verified
 
-Only three are confirmed so far, from the `get-structure` help text: `lead`, `newStore`, `faq`.
-`hero` appears as an `add-block` example.
+Established empirically on a live `store` landing (project `315423`, slug `sb8786-probe`)
+and confirmed against `get-structure`, not inferred from help text. **15 modules.**
 
-**The full catalog is not discoverable from `--help`.** It has to be read off a live
-landing's `get-structure`. This is the blocking dependency for SB-8859's second half and
-for all three archetypes (SB-8865/8866/8867).
+| Module | Seeded by `add-page` | Notes |
+|---|---|---|
+| `header` | ✅ | Site navigation |
+| `leadGameSales` | ✅ | Hero variant aimed at game sales |
+| `description` | ✅ | Prose section |
+| `packs` | ✅ | Currency / item packs |
+| `bento-grid` | ✅ | **Only kebab-case module** — everything else is camelCase |
+| `gallery` | ✅ | Image gallery |
+| `requirements` | ✅ | System requirements |
+| `faq` | ✅ | Question list |
+| `footer` | ✅ | |
+| `hero` | — | |
+| `lead` | — | |
+| `news` | — | |
+| `newStore` | — | **The storefront block.** Binds to the catalog — see below |
+| `store` | — | Second store block; relationship to `newStore` unknown |
+| `rewards` | — | |
+
+**How to reproduce:** `add-page` seeds a 13-block default template covering 9 distinct
+modules. The other 6 were found by probing `add-block` with candidate names and verifying
+each against `get-structure`.
+
+> **Do not trust `add-block`'s exit code.** It returns `0` on failure. A failed add prints
+> `Error: HTTP 500` while a successful one prints `_id: …`, but the reliable check is to
+> diff `get-structure` before and after. An early probe run of ours reported nine false
+> positives on exit code alone. Any script that adds blocks must verify against the
+> structure, not the return code.
+
+**Names not in the catalog** (all probed, all rejected): `video`, `banner`, `subscriptions`,
+`bundles`, `cta`, `features`, `roadmap`, `team`, `socials`, `topup`, `text`, `image`,
+`carousel`, `characters`, `trailer`, `partners`, `countdown`, `timeline`, `testimonials`,
+`reviews`, `awards`, `platforms`, `editions`, `compare`, `pricing`, `social`, `catalog`,
+`gameKeys`, `checkout`, `upsell`, `items`, `featured`, `wishlist`, `preorder`, `download`.
+
+---
+
+## Catalog binding — how a store block reaches the catalog
+
+There is no command for this. The binding lives inside the `newStore` block's
+`components[]`, and is reached with an `update-block` patch:
+
+```json
+"components": [{
+  "type": "newStoreSection",
+  "section": {
+    "item": { "autoSelected": false, "group": "welcome-offer", "type": "bundle" },
+    "title": { "enable": false, "id": "L:<localizationId>" },
+    "hiddenEmpty": true, "horizontalScroll": false
+  },
+  "card": { "selectedLayoutType": "featured", "layouts": { ... } }
+}]
+```
+
+**A store block binds to an item _group_ and an item _type_ — not to item IDs.**
+
+This is the single most important structural fact for the skill:
+
+- The **catalog's group structure determines the storefront's section structure.**
+  One `newStoreSection` per group. Seeding the catalog is therefore a design step,
+  not throwaway setup.
+- Intake must collect item **groups**, not just a flat item list.
+- `card.selectedLayoutType` picks the card design. Available layouts, read from a live
+  block: `featured`, `vertical`, `horizontal`, `large`, `bundle_vertical`,
+  `game-keys-vertical`. Each carries its own `alignment`, `image.format`, `image.size`,
+  `itemsDescriptionEnabled` and `priceInButton`.
+
+## Theme
+
+`create-website --theme` takes JSON. Settable top-level fields, from a live landing:
+
+`backgroundBlur`, `buttonBorderRadius`, `buttons`, `calculationType` (observed:
+`"xds-theme"`), `fonts`, `input`, `pictureBackground`, `videoBackground`.
+
+`theme.calculatedTheme` is derived — a full design-token tree of control colors — and
+should not be written directly. `--colorscheme` does not appear as a field on the landing;
+how it maps into the theme is still unknown, but `--theme` JSON is sufficient without it.
+
+`storeApi` on the landing is only request tuning (`itemsPerRequest`, retry counts), not a
+catalog binding — don't confuse the two.
 
 ---
 
@@ -171,19 +247,43 @@ falls short, file a ticket — do not work around it in code.
 
 ---
 
-## Open questions for the sandbox run
+## Gap-ticket candidates (SB-8872)
 
-1. **What is the full standard block catalog?** Blocks the archetypes need most: hero,
-   store/catalog, bundles, FAQ, footer, nav.
-2. **How is a store block wired to a catalog?** No dedicated command exists. The bundled
-   CLI skill describes "wiring a store block to a catalog", so it is presumably an
-   `update-block` patch. The exact patch path is unknown and is on the critical path for
-   every archetype.
-3. **Why does `create-website --type` accept only `topup`** when `set-landing-type` accepts
-   all three? Deliberate two-step, or an oversight? → gap ticket candidate (SB-8872).
-4. **Six commands take only `--slug`** with no `--merchant-id` / `--project-id`:
-   `enable-preview`, `disable-preview`, `preview-link`, `get-localization`,
-   `update-localization`, `update-many-localization`. Presumably resolved from config.
-   Confirm, because it makes those calls silently config-dependent — a hazard for scripts
-   meant to be reproducible. → gap ticket candidate.
-5. **Does `list-versions` give us backup for free?**
+The `shopbuilder` commands are **generated from OpenAPI 3.x specs** (see `xsolla --help`),
+so most of these are spec gaps rather than CLI bugs — which is where Aadi and Humza's
+spec work on the Shop Builder team comes in.
+
+1. **Invalid block name returns HTTP 500.** `add-block --block <anything-invalid>` returns
+   a bare 500 with no list of valid names. Should be a 400 naming the valid templates.
+   Combined with (2), this makes the block catalog undiscoverable without trial and error.
+2. **No way to enumerate block templates.** There is no `list-blocks` command and no
+   registry on the landing — the top-level `blocks` array is just the IDs of blocks already
+   placed. The catalog in this document had to be brute-forced.
+3. **`add-block` exits 0 on failure.** A 500 still returns exit code 0, so shell scripts
+   cannot detect a failed add without re-reading the structure.
+4. **`create-website --type` accepts only `topup`**, while `set-landing-type` accepts
+   `topup`, `store`, `sellingpage`. Forces a two-call dance for any non-topup landing, and
+   leaves `type:null` in between — which 404s the preview if the second call is missed.
+5. **Six commands silently depend on config.** `enable-preview`, `disable-preview`,
+   `preview-link`, `get-localization`, `update-localization`, `update-many-localization`
+   take only `--slug`, with no `--merchant-id` / `--project-id`. Reproducible scripts
+   cannot pin the target explicitly.
+6. **An invalid `XSOLLA_API_KEY` silently overrides a valid login.** Any command 401s until
+   the variable is unset, even with a healthy `xsolla auth login` session. The CLI's error
+   message explains this well; the precedence itself is the surprise.
+7. **Inconsistent flag naming.** `get-block` takes `--block-id`; `delete-block` and
+   `duplicate-block` take `--blockid`.
+
+---
+
+## Still open
+
+1. **`store` vs `newStore`** — two store modules exist. Which one do the archetypes use,
+   and what is the difference? `newStore` is the one carrying the catalog binding on a
+   real landing, so it is the working assumption.
+2. **How does `--colorscheme` map into the theme?** It is not a field on the landing.
+   Not blocking: `--theme` JSON covers styling.
+3. **Does `list-versions` give us backup for free?** If the backend versions every write,
+   our export may be belt-and-braces.
+4. **Is the block catalog landing-type dependent?** The catalog here was read off a `store`
+   landing. A `topup` or `sellingpage` landing may expose a different set.

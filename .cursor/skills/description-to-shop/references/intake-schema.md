@@ -54,36 +54,51 @@ the game's actual content. A wrong price is worse than a question.
 
 | Field | Req | Inferable | Default | Notes |
 |---|---|---|---|---|
-| `colorscheme` | ✅ | ✕ | **needs confirmation** | Maps to `create-website --colorscheme`. Valid names unknown until the sandbox run — if a named-scheme list exists, offer it as a pick-one and this stops being a hard ask. |
-| `theme_overrides` | ⬜ | ✕ | none | JSON for `create-website --theme`. Schema unknown; confirm on sandbox. |
+| `colorscheme` | ⬜ | ✕ | omit | `create-website --colorscheme`. Does not appear as a field on a built landing; how it maps into the theme is unknown. Not required — `theme_overrides` covers styling. |
+| `theme_overrides` | ⬜ | ✅ | platform default | JSON for `create-website --theme`. Settable fields: `backgroundBlur`, `buttonBorderRadius`, `buttons`, `calculationType`, `fonts`, `input`, `pictureBackground`, `videoBackground`. Never write `calculatedTheme` — it is derived. |
 | `tone` | ⬜ | often | from genre | Copywriting register: "gritty", "playful". |
 
-> **Open:** if `--colorscheme` takes a free-form string rather than an enum, this field
-> becomes inferable from `art_direction` and drops out of the required set.
-> Resolve on the sandbox run before finalizing.
+Visual style is the section where inference should be most aggressive. A publisher with no
+design assets — the epic's whole premise — cannot answer questions about border radius.
+Derive a theme from `art_direction` and `game_genre`, present it in the plan, and let them
+correct it there.
 
 ## D. Catalog
 
-The heaviest section, and where intake most often stalls.
+**Scope, settled (Aaron Springut, 2026-09-10):** this skill does **not** create catalog
+entities. The catalog is seeded once, by hand, using the existing AI Kit catalog skill.
+`description-to-shop` *reads* that catalog and wires it into the storefront so the shop has
+the right items in it and looks good.
+
+Intake therefore collects enough to **design the storefront around** the catalog — not
+enough to build one.
+
+### The thing that actually matters: groups
+
+A `newStore` block binds to an **item group** and an **item type**, never to item IDs
+(see `cli-commands.md` → *Catalog binding*). One store section per group.
+
+So the group structure *is* the storefront structure. Intake collects groups first and
+items only as their contents.
 
 | Field | Req | Inferable | Default | Notes |
 |---|---|---|---|---|
-| `has_existing_catalog` | ✅ | ✕ | none | Yes → read it, do not invent. No → the fields below are needed. |
-| `real_currency` | ✅ | ✕ | `USD` | ISO code. |
-| `virtual_currency` | ⬜ | ✕ | none | Name + code, e.g. "Shards"/`SHD`. Required if any item is priced in VC. |
-| `items[]` | ✅ | ✕ | none | Per item: `name`, `price`, `currency`, optional `description`, `image`. |
-| `bundles[]` | ⬜ | ✕ | none | **Required for the live-service archetype.** Contents + bundle price. |
-| `currency_packs[]` | ⬜ | ✕ | none | Typically required for `topup` landings. |
+| `catalog_exists` | ✅ | ✕ | none | If no, stop and seed the catalog first — that is a prerequisite, not part of this run. |
+| `groups[]` | ✅ | partly | read from catalog | Per group: `group` (the catalog group key), `item_type` (`bundle`, `virtual_item`, `virtual_currency_package`, `game_key`), `display_title`, and a `layout` from the six card layouts. |
+| `group_order` | ✅ | ✅ | catalog order | Section order down the page. |
+| `featured_group` | ⬜ | ✅ | first group | Gets the `featured` card layout. |
+| `real_currency` | ⬜ | ✕ | read from catalog | Display only — the catalog owns the real value. |
 
-> **Never invent prices or item names.** If the description says "sell skins and a
-> battle pass" with no numbers, that is a Missing field and must be asked.
-> A placeholder price that reaches a live shop is the worst failure mode this skill has.
+### What intake must not do
 
-> **Scope note.** Whether the skill *creates* catalog entities (`xsolla catalog`, or the
-> `catalog-admin` / `catalog-import` skills) or only *wires* an existing catalog into a store
-> block is unresolved. The epic's DoD lists catalog under intake but the build step says
-> "standard blocks only". Needs a ruling from the mentor — it changes the size of SB-8863
-> substantially.
+- **Never invent prices, item names or currency codes.** They are read from the catalog.
+  If a group named in the description does not exist in the catalog, that is a Missing
+  field — ask, do not create it and do not guess its contents.
+- **Never create catalog entities**, even when it would be convenient. Out of scope by
+  decision. If the catalog is thin, say so and point at the catalog skill.
+
+> **Open:** whether `item_type` values above are exactly the catalog's type strings.
+> `bundle` is confirmed from a live block. Verify the rest when reading a seeded catalog.
 
 ## E. Pages
 
@@ -109,7 +124,7 @@ Collected from the environment, but part of completeness. Absent → hard stop b
 | Field | Source |
 |---|---|
 | `merchant_id` | `xsolla config list` |
-| `project_id` | `xsolla config list` — **must be non-zero** |
+| `project_id` | `xsolla config list` — **must be non-zero**. Test project for this epic: `315423` ("SB-8786 description-to-shop test"), merchant `936457` |
 | `slug` | Proposed by the skill from `game_name`, confirmed in the plan |
 | `auth_ok` | `xsolla auth status` — non-expired token |
 | `backup_path` | Written by the backup script before the first write (SB-8862) |

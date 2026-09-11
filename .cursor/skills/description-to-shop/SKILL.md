@@ -19,9 +19,9 @@ metadata:
 
 # Description to Shop
 
-> **Status: work in progress (SB-8786).** Intake, plan format, and the CLI surface are
-> drafted. The build procedure is blocked on the standard block catalog, which can only be
-> read off a live landing. Do not rely on this skill until this notice is removed.
+> **Status: work in progress (SB-8786).** Intake, plan format, the CLI surface and the
+> standard block catalog are drafted and verified against a live landing. The build
+> scripts are not written yet. Do not rely on this skill until this notice is removed.
 
 Turn a short, plain-language description of a game and its shop into a built Shop Builder
 shop, guiding the user through every missing detail along the way.
@@ -49,8 +49,10 @@ Headless Shop path — custom frontend, Store API, Checkout SDK — which is `sh
 - **Never publish.** The CLI has no publish command, so this is structural, not just policy —
   but never work around it either.
 - **Standard blocks only.** Never call `create-custom-block` / `update-ai-block`.
-- **Never invent facts.** Prices, item names, currency codes and studio names are asked for,
-  never guessed. Structure may be inferred; facts may not.
+- **Never invent facts.** Prices, item names, currency codes and studio names are read from
+  the catalog or asked for — never guessed. Structure and styling may be inferred; facts may not.
+- **Never create catalog entities.** The catalog is seeded separately with the AI Kit
+  catalog skill. This skill reads it and wires it into the storefront.
 - **Back up before the first write.**
 - **Test projects only.** Never a partner's live project.
 - **Use `xsolla auth login`.** If a manual `XSOLLA_SHOPBUILDER_SESSION` copy is needed,
@@ -69,3 +71,6 @@ Headless Shop path — custom frontend, Store API, Checkout SDK — which is `sh
 
 - Xsolla CLI ≥ 1.9.4, authenticated with `xsolla auth login`
 - A **test** project with Shop Builder enabled, and a non-zero `project_id` in `xsolla config list`
+- A seeded catalog in that project, with items organised into **groups** — store blocks bind
+  to a group, so the group structure determines the storefront structure
+- No `XSOLLA_API_KEY` in the environment: an invalid one silently overrides a valid login
