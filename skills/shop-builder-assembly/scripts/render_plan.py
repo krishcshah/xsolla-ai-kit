@@ -121,6 +121,7 @@ def omit_unwritable_blocks(
 ) -> tuple[list[dict], list[dict]]:
     omissions: list[dict] = []
     for page in pages:
+        page["requested_blocks"] = list(page["blocks"])
         kept: list[str] = []
         for module in page["blocks"]:
             reason = missing_data_reason(module, brief)
@@ -128,16 +129,24 @@ def omit_unwritable_blocks(
                 kept.append(module)
             else:
                 omissions.append(
-                    {"path": page["path"], "module": module, "reason": reason}
+                    {
+                        "path": page["path"],
+                        "module": module,
+                        "reason": reason,
+                        "action": "omit",
+                    }
                 )
         page["blocks"] = kept
     return pages, omissions
 
 
-def bind_current_state(pages: list[dict], structure: object | None) -> dict:
+def bind_current_state(
+    pages: list[dict], omissions: list[dict], structure: object | None
+) -> dict:
     if structure is None:
         for page in pages:
             page["current_blocks"] = []
+            page["preserved_blocks"] = []
             page["removals"] = []
         return {
             "status": "not-supplied",
@@ -172,6 +181,7 @@ def bind_current_state(pages: list[dict], structure: object | None) -> dict:
 
     for page_plan in pages:
         page_plan["current_blocks"] = []
+        page_plan["preserved_blocks"] = []
         page_plan["removals"] = []
         current_page = by_path.get(page_plan["path"])
         if current_page is None:
@@ -183,6 +193,23 @@ def bind_current_state(pages: list[dict], structure: object | None) -> dict:
             raise ValueError(
                 "current pages[].blocks must contain full block objects from get-structure"
             )
+        omitted_on_page = {
+            omission["module"]: omission
+            for omission in omissions
+            if omission["path"] == page_plan["path"]
+        }
+        current_modules = {
+            block.get("module")
+            for block in blocks
+            if isinstance(block.get("module"), str)
+        }
+        preserved_modules = set(omitted_on_page) & current_modules
+        if preserved_modules:
+            page_plan["blocks"] = [
+                module
+                for module in page_plan["requested_blocks"]
+                if module in page_plan["blocks"] or module in preserved_modules
+            ]
         kept: set[str] = set()
         desired = page_plan["blocks"]
         for block in blocks:
@@ -193,6 +220,16 @@ def bind_current_state(pages: list[dict], structure: object | None) -> dict:
                     "every current block must have string _id and module fields"
                 )
             page_plan["current_blocks"].append({"block_id": block_id, "module": module})
+            if module in preserved_modules and module not in kept:
+                page_plan["preserved_blocks"].append(
+                    {
+                        "block_id": block_id,
+                        "module": module,
+                        "reason": omitted_on_page[module]["reason"],
+                    }
+                )
+                omitted_on_page[module]["action"] = "preserve-existing"
+                omitted_on_page[module]["block_id"] = block_id
             if module in desired and module not in kept:
                 kept.add(module)
             else:
@@ -218,7 +255,7 @@ def build_plan(brief: dict, current_structure: object | None = None) -> dict:
     preset = choose_preset(brief)
     catalog_groups = brief["catalog"]["groups"]
     pages, omissions = omit_unwritable_blocks(selected_pages(brief, preset), brief)
-    current_state = bind_current_state(pages, current_structure)
+    current_state = bind_current_state(pages, omissions, current_structure)
     warnings = []
     brand = brief.get("brand", {})
     if not brand.get("logo"):

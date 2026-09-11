@@ -80,6 +80,45 @@ class PresetTests(unittest.TestCase):
         self.assertNotIn("newStore", plan["pages"][0]["blocks"])
         self.assertIn("newStore", {item["module"] for item in plan["omissions"]})
 
+    def test_existing_block_without_replacement_data_is_preserved(self) -> None:
+        self.brief["content"].pop("faq", None)
+        structure = {
+            "_id": "landing",
+            "pages": [
+                {
+                    "_id": "home",
+                    "name": "Home",
+                    "path": "/",
+                    "blocks": [
+                        {"_id": "header", "module": "header"},
+                        {"_id": "hero", "module": "leadGameSales"},
+                        {"_id": "store", "module": "newStore"},
+                        {"_id": "existing-faq", "module": "faq"},
+                        {"_id": "footer", "module": "footer"},
+                    ],
+                }
+            ],
+        }
+        plan = render_plan.build_plan(self.brief, structure)
+        self.assertEqual(
+            ["header", "leadGameSales", "newStore", "faq", "footer"],
+            plan["pages"][0]["blocks"],
+        )
+        self.assertEqual([], plan["pages"][0]["removals"])
+        self.assertEqual(
+            [
+                {
+                    "block_id": "existing-faq",
+                    "module": "faq",
+                    "reason": "no approved FAQ supplied",
+                }
+            ],
+            plan["pages"][0]["preserved_blocks"],
+        )
+        faq = next(item for item in plan["omissions"] if item["module"] == "faq")
+        self.assertEqual("preserve-existing", faq["action"])
+        self.assertEqual("existing-faq", faq["block_id"])
+
     def test_page_overrides_replace_preset_pages(self) -> None:
         self.brief["content"]["page_overrides"] = [
             {

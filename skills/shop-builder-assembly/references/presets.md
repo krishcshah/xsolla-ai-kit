@@ -41,7 +41,9 @@ unit. Do not invent event dates, discounts, scarcity, or eligibility.
 ## Override rules
 
 1. Explicit publisher page/block choices beat preset defaults.
-2. Omit blocks whose required data is missing; report the omission in the plan.
+2. Do not add a block when its required data is missing. On an existing target,
+   preserve an already configured instance unchanged unless the user explicitly
+   confirms its removal; report either action in the plan.
 3. Do not substitute an unverified module for a missing capability.
 4. Record reviewer, date, and decision here when a preset is approved.
 

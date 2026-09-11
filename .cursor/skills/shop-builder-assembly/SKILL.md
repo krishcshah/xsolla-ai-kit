@@ -53,7 +53,9 @@ Treat the catalog and presets as provisional until the decisions in
 4. Render the proposed plan with
    `scripts/render_plan.py <brief.json> --structure <backup-dir>/structure.json` and
    show the complete ordered plan, including exact block IDs to remove and catalog
-   mappings. Omit `--structure` only for a new slug's bootstrap-only plan.
+   mappings. Preserve existing configured blocks when replacement data is missing;
+   do not silently turn an omission rule into deletion. Omit `--structure` only for
+   a new slug's bootstrap-only plan.
 5. Ask for explicit confirmation of the plan's `confirmation_id` immediately before
    the first remote write. Earlier permission to "build a shop" is not confirmation
    of a new plan. Re-render and reconfirm if the brief or plan changes.
