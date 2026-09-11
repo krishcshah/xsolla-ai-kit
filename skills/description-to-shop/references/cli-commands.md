@@ -247,6 +247,54 @@ falls short, file a ticket — do not work around it in code.
 
 ---
 
+## Behaviour you only find by running it
+
+Four things that are not in any help text and will break a naive script.
+
+### 1. `add-block` prepends; its help says it appends
+
+> "`--index` … appended to the end when omitted"
+
+It is not appended. With `--index` omitted, blocks land at the **front**, so a
+page built in order comes out exactly reversed. Passing an explicit `--index`
+per block places them correctly. **Always pass `--index`.**
+
+### 2. `add-page` always seeds a 13-block template
+
+There is no way to create an empty page. Every `add-page` produces:
+
+`header · leadGameSales · description · packs ×3 · bento-grid ×3 · gallery · requirements · faq · footer`
+
+So shaping a page means deleting the seed and adding what you want. That is
+what `scripts/shape-page.sh` does — clear, then append with explicit indices,
+which avoids `move-block` index arithmetic entirely.
+
+### 3. Both reads and writes are throttled, and writes fail silently
+
+Roughly half a dozen rapid `get-structure` calls start returning an empty body.
+Worse, a rapid unpaced burst of `add-block` calls **silently drops every one**
+and leaves the page empty — no error, exit code 0.
+
+Consequences for any script here:
+
+- Read the structure **once**, work from the cached JSON. Never re-read per item.
+- Pace writes (~1s apart), and verify the final module sequence afterwards.
+- Treat a mismatch as "retry slower", not "invalid block name" — both look the same.
+
+`scripts/shape-page.sh` does all three, including one slower repair pass.
+
+### 4. Preview is gated on merchant licensing agreements
+
+`enable-preview` and `preview-link` return **403**, and `verify-website` **400**,
+until the merchant's agreements are signed. `list-agreements --merchant-id <id>`
+shows the state; both a `payment` and a `product` agreement must be signed.
+
+Signing is a legal acceptance performed by a person in Publisher Account. No
+script should do it. `scripts/preview.sh` detects the unsigned state and says so
+rather than returning a bare 403.
+
+---
+
 ## Gap-ticket candidates (SB-8872)
 
 The `shopbuilder` commands are **generated from OpenAPI 3.x specs** (see `xsolla --help`),
@@ -273,6 +321,19 @@ spec work on the Shop Builder team comes in.
    message explains this well; the precedence itself is the surprise.
 7. **Inconsistent flag naming.** `get-block` takes `--block-id`; `delete-block` and
    `duplicate-block` take `--blockid`.
+8. **`add-block` prepends although its help says it appends.** Either the behaviour or
+   the documented default is wrong. Highest-impact item here: it silently reverses any
+   page built without an explicit `--index`.
+9. **Throttled writes fail silently.** A burst of `add-block` calls returns success and
+   creates nothing. A 429, or any error at all, would make this self-diagnosing.
+10. **No way to create an empty page.** `add-page` always seeds 13 blocks, so every
+    custom layout starts with 13 deletes.
+11. **Catalog create commands report a missing `--description` as a 422.** `create-items`
+    correctly says "required flag not set"; `admin-create-currency-package` and
+    `admin-create-bundles` return `Unprocessable Entity` instead. Same root cause,
+    two error styles.
+12. **`config set` writes to an environment.** Setting `project-id` landed in a `dev`
+    environment whose `merchant-id` was `0`, silently changing the active merchant.
 
 ---
 
