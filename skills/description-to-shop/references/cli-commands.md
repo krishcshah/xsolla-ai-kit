@@ -335,11 +335,21 @@ or `get-structure`, never the canvas.
 
 ---
 
-## Gap-ticket candidates (SB-8872)
+## Gap tickets — filed
 
-The `shopbuilder` commands are **generated from OpenAPI 3.x specs** (see `xsolla --help`),
-so most of these are spec gaps rather than CLI bugs — which is where Aadi and Humza's
-spec work on the Shop Builder team comes in.
+All filed 2026-09-11 and linked to SB-8786. The `shopbuilder` commands are **generated
+from OpenAPI 3.x specs** (see `xsolla --help`), so most are spec gaps rather than CLI bugs.
+
+| Ticket | Covers |
+|---|---|
+| SB-8994 | `add-block` prepends although its help says it appends |
+| SB-8995 | Invalid store-section item types stored verbatim; undocumented 4 default sections |
+| SB-8996 | Throttled reads return empty, throttled writes fail silently, exit 0 on HTTP 500 |
+| SB-8997 | No block-template enumeration; invalid name returns bare 500; no way to make an empty page |
+| SB-8998 | CLI cannot mint a preview token |
+| SB-8999 | Seven consistency issues across `shopbuilder` and `catalog` |
+
+Detail behind each:
 
 1. **Invalid block name returns HTTP 500.** `add-block --block <anything-invalid>` returns
    a bare 500 with no list of valid names. Should be a 400 naming the valid templates.
