@@ -163,6 +163,30 @@ class ApplyPlanTests(unittest.TestCase):
         )
         self.assertEqual(["de-DE"], result["added"])
 
+    def test_ensure_locales_is_idempotent_when_languages_exist(self) -> None:
+        structure = {"languages": ["en-US", "de-DE"]}
+        with (
+            mock.patch.object(
+                apply_plan, "structure", side_effect=[structure, structure]
+            ),
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.ensure_locales("shop", ["en-US", "de-DE"])
+        run_json.assert_not_called()
+        self.assertEqual([], result["added"])
+
+    def test_ensure_locales_rejects_malformed_refreshed_languages(self) -> None:
+        with (
+            mock.patch.object(
+                apply_plan,
+                "structure",
+                side_effect=[{"languages": ["en-US"]}, {"languages": ["en-US", {}]}],
+            ),
+            mock.patch.object(apply_plan, "run_json"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "locale reconciliation"):
+                apply_plan.ensure_locales("shop", ["en-US", "de-DE"])
+
     def test_structure_verifier_accepts_matching_unpublished_site(self) -> None:
         plan = {
             "confirmation_id": "sha256:test",

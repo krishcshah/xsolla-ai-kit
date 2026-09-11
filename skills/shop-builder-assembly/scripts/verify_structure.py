@@ -108,7 +108,12 @@ def verify(plan: dict, structure: object) -> dict:
 
     languages = current.get("languages")
     requested_locales = plan.get("locales")
-    if not isinstance(languages, list) or not isinstance(requested_locales, list):
+    if (
+        not isinstance(languages, list)
+        or any(not isinstance(locale, str) for locale in languages)
+        or not isinstance(requested_locales, list)
+        or any(not isinstance(locale, str) for locale in requested_locales)
+    ):
         errors.append("structure or plan has an invalid locale list")
     else:
         missing_locales = sorted(set(requested_locales) - set(languages))

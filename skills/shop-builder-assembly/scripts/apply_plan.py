@@ -295,8 +295,10 @@ def ensure_locales(slug: str, desired: list[str]) -> dict:
         languages.append(locale)
     refreshed = structure(slug)
     final_languages = refreshed.get("languages")
-    if not isinstance(final_languages, list) or any(
-        locale not in final_languages for locale in desired
+    if (
+        not isinstance(final_languages, list)
+        or any(not isinstance(language, str) for language in final_languages)
+        or any(locale not in final_languages for locale in desired)
     ):
         raise RuntimeError("locale reconciliation did not produce every requested locale")
     return {
