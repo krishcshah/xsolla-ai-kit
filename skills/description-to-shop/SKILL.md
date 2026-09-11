@@ -1,17 +1,12 @@
 ---
 name: description-to-shop
 description: >-
-  Build a complete Xsolla Shop Builder shop from nothing but a plain-language description —
-  no design, mockup, spec, or brief needed. START HERE when someone describes a game in a
-  few sentences and wants a shop built: it runs a guided intake (game info, audience and
-  platform, visual style, catalog, pages, languages), asks only for what is missing, writes
-  a concrete plan, gets explicit approval, backs up the project, and builds the shop with
-  standard blocks via `xsolla shopbuilder`. Use for "build me a shop from this description",
-  "I don't have a design, just make a store", "turn this idea into a webshop", "set up a
-  storefront for my game", "make a top-up page", "I need a shop but no mockups". Handles
-  three archetypes — mobile single-page shop, PC multi-page portal, and live-service with
-  bundles. Delivers a preview link; never publishes. For Shop Builder landings, not the
-  Headless Shop / custom-frontend path (see `shop-setup` for that).
+  Turn a plain-language game description into the normalized, source-attributed shop
+  brief consumed by shop-builder-assembly. Use when a publisher has no design or
+  written specification and asks to build a Shop Builder site, webshop, top-up page,
+  PC portal, or live-service store from prose. This skill owns intake and inference;
+  shop-builder-assembly owns presets, confirmation, backups, CLI writes, verification,
+  and preview. Do not use this skill to implement a second assembly workflow.
 metadata:
   owner: k.shah
   domain: store
@@ -19,130 +14,65 @@ metadata:
 
 # Description to Shop
 
-Turn a short, plain-language description of a game into a built Shop Builder shop,
-guiding the user through every missing detail on the way.
+Convert a short game description into a valid `shop-builder-assembly` brief, then
+hand it to that skill. Do not call Shop Builder write commands here.
 
-## When to use this
+## 1. Extract the description
 
-Use when the user has **no design and no spec** — just a description. If they already
-have a reference site, a mockup or a written brief, that is a different starting point.
+Read [references/intake-schema.md](references/intake-schema.md). Classify every
+required fact as stated, safely inferred, or missing. Infer presentation choices such
+as the likely preset; never invent prices, catalog groups, dates, game facts, studio
+names, or translated copy.
 
-This builds **Shop Builder landings** via `xsolla shopbuilder`. It is not the Headless
-Shop path (custom frontend, Store API, Checkout SDK) — that is `shop-setup`.
+Ask for all missing required facts in one batch. Use read-only discovery for the
+active CLI project and its existing catalog groups. If the catalog is absent or a
+named group cannot be found, stop and direct the user to the catalog skill rather than
+creating catalog entities.
 
-## Prerequisites
+## 2. Produce the shared brief
 
-- Xsolla CLI ≥ 1.9.4, authenticated with `xsolla auth login`
-- A **test** project with Shop Builder enabled and a non-zero `project_id`
-- A catalog already seeded in that project, **organised into groups** — a store block
-  binds to a group, so the groups decide the storefront's sections
-- No stale `XSOLLA_API_KEY` in the environment: an invalid one silently overrides a
-  valid login and 401s every call
-- To *view* the result: a human clicks Preview in the editor — the CLI cannot mint the token
+Read the input contract in
+`shop-builder-assembly/references/shop-brief.md` and write one version-1 JSON object
+matching it. In particular:
 
-## The flow
+- Put platforms and lifecycle under `game`.
+- Put the proposed slug, locales, and either `auto` or an explicit preset under `site`.
+- Map only verified, same-project catalog groups under `catalog.groups`; use
+  `__all__` for all items of a supported type.
+- Put approved copy and publisher page overrides under `content`.
+- Add `{"kind":"description", ...}` to `sources` and preserve any publisher-answer
+  provenance used to complete missing facts.
+- Never include API keys, tokens, session cookies, passwords, or browser storage.
 
-### 1. Read the description
+Validate the result with the assembly skill's
+`scripts/validate_shop_brief.py`. Fix input errors before handoff.
 
-Classify every field in `references/intake-schema.md` as **Stated**, **Inferred** or
-**Missing**. Infer structure and styling freely — that is the job. Never infer facts.
+## 3. Delegate assembly
 
-### 2. Ask once
+Invoke `shop-builder-assembly` with the validated brief. That skill exclusively owns:
 
-Batch every Missing required field into a single message, grouped by section. Never
-interrogate one field per turn. Optional fields are not asked; they take defaults and
-the plan says so.
+- preset selection and page/block defaults;
+- the complete confirmation-bound plan;
+- project allowlisting and Publisher-login preflight;
+- backup-before-write enforcement;
+- all `xsolla shopbuilder` writes;
+- structural, localization, catalog, readiness, and preview verification;
+- the never-publish safeguard and evaluation record.
 
-### 3. Present the plan
-
-Use the template in `references/plan-format.md`. Pages, blocks, catalog groups,
-assumptions, and an explicit "not included" section. One message, whole plan.
-
-### 4. Get explicit approval
-
-No writes before this. An answer to an intake question is data, not consent. Changes
-mean revise and re-present in full — approval of v1 never carries to v2.
-
-### 5. Back up
-
-```
-scripts/backup-landing.sh <slug> [out-dir]
-```
-Captures structure, localization and assets. A project with no landings is a valid
-state — record it, don't skip silently.
-
-### 6. Build
-
-Build from the **approved plan**, by composing the primitives:
-
-```
-scripts/create-landing.sh     <slug> <name> <type>
-scripts/shape-page.sh         <slug> <page-path> <block>...
-scripts/set-store-sections.sh <slug> <block-id> <group=type:layout>...
-```
-
-`scripts/build-archetype.sh` is a convenience for the three canonical shapes only.
-In eval, 6 of 12 realistic descriptions did **not** fit a canned skeleton — extra
-pages, extra store sections, or requests with no matching block. Treat the
-archetype as a starting layout, not a constraint, and compose when the plan differs.
-
-### 7. Hand over the preview
-
-```
-scripts/preview.sh <slug>
-```
-The CLI **cannot** mint a preview token — `preview-link` 403s for publisher logins. The
-script prints the editor URL and the built structure; a human clicks **Preview** there to
-view it. Say this plainly rather than implying a link is coming. Publishing is a separate
-human step, and no CLI command for it exists.
-
-## Archetypes
-
-| Archetype | Shape | Default bindings |
-|---|---|---|
-| `mobile` | One page: header · leadGameSales · newStore · faq · footer | `currency-packs` as vertical cards |
-| `pc-portal` | Home / Store / Support | `editions` large, `cosmetics` vertical |
-| `live-service` | One page, two store sections | `featured-bundles` featured, `currency-packs` horizontal |
-
-Groups are arguments, not constants — read the real ones with
-`scripts/list-catalog-groups.sh` and pass those. The archetype fixes the page and
-block skeleton only; anything else in the plan is built from the primitives above.
-
-Things the standard blocks cannot do, which belong in the plan's "Not included":
-a roadmap page, and any bundle that rotates on a schedule — there is no
-scheduling anywhere in Shop Builder's standard blocks.
-
-## Hard rules
-
-1. **Never publish.** The CLI has no publish command, so this is structural rather than
-   policy — but never work around it either.
-2. **Standard blocks only.** Never call `create-custom-block` or `update-ai-block`.
-3. **Never invent facts.** Prices, item names, currency codes and studio names are read
-   from the catalog or asked for. Structure and styling may be inferred; facts may not.
-4. **Never create catalog entities.** The catalog is seeded separately. This skill reads
-   it and wires it in.
-5. **Back up before the first write.**
-6. **Test projects only.** Never a partner's live project.
-7. **Use `xsolla auth login`.** If a manual `XSOLLA_SHOPBUILDER_SESSION` copy is ever
-   needed, document it and file a ticket — do not work around it in code.
-8. **Never accept licensing agreements.** Accepting terms is a legal act for a person in
-   Publisher Account. (They do not gate preview — that was our earlier assumption and it
-   was wrong.)
-9. **Use the scripts.** They encode the API's real behaviour — throttling, the prepend
-   bug, silent write failures. Ad-hoc calls will get these wrong.
+Do not ask for a separate Description-skill approval and do not run legacy local
+assembly scripts. One confirmation in `shop-builder-assembly` covers the exact plan
+that will be applied.
 
 ## Failure handling
 
-Stop, report which step failed and what exists so far, and point at the backup. Do not
-retry blindly, and do not roll back on your own initiative — a half-built landing the
-user can inspect beats a silent partial rollback they cannot.
+If intake cannot produce a valid brief, report the missing facts. If assembly stops,
+return its exact blocker and backup location without retrying or switching projects.
 
 ## References
 
-| File | Contents |
-|---|---|
-| [`references/intake-schema.md`](references/intake-schema.md) | Every field, required vs optional, defaults, completeness gate |
-| [`references/plan-format.md`](references/plan-format.md) | Plan template, approval rules, build order |
-| [`references/cli-commands.md`](references/cli-commands.md) | All 43 commands, the verified block catalog, catalog binding, and the four behaviours that only show up at runtime |
-| [`scripts/`](scripts/) | `lib.sh`, `list-catalog-groups.sh`, `backup-landing.sh`, `create-landing.sh`, `shape-page.sh`, `set-store-sections.sh`, `build-archetype.sh`, `preview.sh`, `seed-test-catalog.sh` |
-| [`evals/`](evals/) | Twelve eval inputs, run log |
+- [references/intake-schema.md](references/intake-schema.md) — description intake and
+  inference boundaries.
+- [references/plan-format.md](references/plan-format.md) — preview of the normalized
+  handoff and how it becomes the assembly plan.
+- `shop-builder-assembly/references/shop-brief.md` — authoritative handoff contract
+  supplied by the SB-8796 dependency.

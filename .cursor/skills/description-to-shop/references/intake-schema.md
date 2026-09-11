@@ -76,7 +76,8 @@ enough to build one.
 ### The thing that actually matters: groups
 
 A `newStore` block binds to an **item group** and an **item type**, never to item IDs
-(see `cli-commands.md` → *Catalog binding*). One store section per group.
+(see `shop-builder-assembly/references/cli-operations.md`). One store section per
+group.
 
 So the group structure *is* the storefront structure. Intake collects groups first and
 items only as their contents.
@@ -84,7 +85,7 @@ items only as their contents.
 | Field | Req | Inferable | Default | Notes |
 |---|---|---|---|---|
 | `catalog_exists` | ✅ | ✕ | none | If no, stop and seed the catalog first — that is a prerequisite, not part of this run. |
-| `groups[]` | ✅ | partly | read from catalog | Per group: `group` (the catalog group key), `item_type` (`bundle`, `virtual_item`, `virtual_currency_package`, `game_key`), `display_title`, and a `layout` from the six card layouts. |
+| `groups[]` | ✅ | partly | read from catalog | Normalize each verified group to `external_id`, `type` (`bundle`, `virtual_good`, or `virtual_currency`), and `placement` (`featured`, `primary`, or `secondary`). |
 | `group_order` | ✅ | ✅ | catalog order | Section order down the page. |
 | `featured_group` | ⬜ | ✅ | first group | Gets the `featured` card layout. |
 | `real_currency` | ⬜ | ✕ | read from catalog | Display only — the catalog owns the real value. |
@@ -95,8 +96,8 @@ Every eval description except one names **items and prices**, never groups. The
 block binds to a group. So intake always has a translation step, and it comes
 before the plan:
 
-1. Run `scripts/list-catalog-groups.sh` to read the real groups, what each holds,
-   and a suggested item type per group.
+1. Use the assembly skill's read-only preflight/catalog discovery to read the real
+   groups and their item types.
 2. Map what the user described onto those groups. "Three coin packs and a starter
    bundle" is two sections, not four items.
 3. Anything the user named that has no group is **Missing** — ask, or say the
@@ -115,9 +116,6 @@ something that silently shows the wrong thing.
   field — ask, do not create it and do not guess its contents.
 - **Never create catalog entities**, even when it would be convenient. Out of scope by
   decision. If the catalog is thin, say so and point at the catalog skill.
-
-> **Open:** whether `item_type` values above are exactly the catalog's type strings.
-> `bundle` is confirmed from a live block. Verify the rest when reading a seeded catalog.
 
 ## E. Pages
 
@@ -143,25 +141,25 @@ Collected from the environment, but part of completeness. Absent → hard stop b
 | Field | Source |
 |---|---|
 | `merchant_id` | `xsolla config list` |
-| `project_id` | `xsolla config list` — **must be non-zero**. Test project for this epic: `315423` ("SB-8786 description-to-shop test"), merchant `936457` |
+| `project_id` | `xsolla config list` — **must be non-zero** and belong to the approved test context. |
 | `slug` | Proposed by the skill from `game_name`, confirmed in the plan |
 | `auth_ok` | `xsolla auth status` — non-expired token |
-| `backup_path` | Written by the backup script before the first write (SB-8862) |
 
 ---
 
 ## Completeness gate
 
-The **first write** is `create-website`. Before it, all of the following must hold:
+Before handing the brief to `shop-builder-assembly`, all of the following must hold:
 
 1. Every ✅ field is Stated or Inferred — none Missing.
-2. Every Inferred field appears in the plan the user approved.
+2. Every inferred field is surfaced to the user with its provenance.
 3. `auth_ok` is true and `project_id` is non-zero.
-4. A backup exists at `backup_path`, or the project has no landings yet (nothing to back up —
-   record that fact explicitly rather than skipping the step silently).
-5. The user has given explicit confirmation on the plan.
+4. The normalized brief passes the shared assembly validator.
 
-Fail any → do not write. Report which gate failed.
+Fail any → do not hand off. Report which gate failed.
+
+Backup, target allowlisting, exact-plan confirmation, and every write are downstream
+gates owned by `shop-builder-assembly`; do not duplicate them here.
 
 Instrument this: the skill logs the filled/required ratio at the gate. That log *is* the
 intake-completeness metric, and it is how SB-8869 reports the number rather than estimating it.

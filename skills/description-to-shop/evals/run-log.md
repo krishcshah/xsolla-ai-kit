@@ -3,7 +3,10 @@
 Inputs: [`test-descriptions.md`](test-descriptions.md). Targets from SB-8786:
 intake completeness 100%, run success ≥ 4/5, manual interventions ≤ 2.
 
-Two kinds of run are recorded, kept apart because they prove different things.
+Two kinds of historical run are recorded, kept apart because they prove different
+things. The build-layer prototype scripts used for these runs were removed when
+SB-8786 was integrated with `shop-builder-assembly`; future builds must use that
+shared skill.
 
 ---
 
@@ -20,9 +23,9 @@ then confirmed in a live preview opened from the Shop Builder editor.
 
 ### Composition runs (3) — the descriptions that do not fit a canned archetype
 
-Built from primitives (`create-landing` -> `shape-page` -> `set-store-sections`)
-rather than `build-archetype.sh`, because each needs a shape the canned
-skeletons do not offer. This is what proves the eval finding in section B.3.
+Built by composing the prototype's low-level operations because each needed a shape
+the canned skeletons did not offer. The same variation is now represented through
+the shared assembly brief and page overrides.
 
 | # | Input | Slug | Needed | Result | Interventions |
 |---|---|---|---|---|---|
@@ -113,21 +116,18 @@ Five real gaps, none of which the build-layer runs could have found.
 1. **Descriptions name items; store blocks bind to groups.** Every description
    except L3 lists items and prices, never groups. The skill must translate, and
    `references/intake-schema.md` never says how. Added
-   `scripts/list-catalog-groups.sh` so intake can at least read the real groups
-   and map onto them; the schema still needs a written step for the mapping.
+   read-only catalog discovery so intake can read the real groups and map onto them.
 
 2. **Currency packages have no group binding.** They bind as
    `virtual_currency` with group `__all__`. So "put the coin packs in a Packs
    section" is not expressible — a user asking for two differently-grouped
    currency sections cannot get it. Needs stating as a limitation.
 
-3. **`build-archetype.sh` is too rigid for real inputs.** 6 of 12 descriptions
-   don't fit a canned skeleton (M2, P3, P4, L1, L2 and by extension M4). The
-   underlying primitives compose fine — `shape-page.sh` and
-   `set-store-sections.sh` take arbitrary block and section lists — so the fix
-   is to treat `build-archetype.sh` as the canonical-case convenience it is, and
-   have the skill compose primitives from the approved plan. Documented; the
-   SKILL.md flow should lead with the primitives.
+3. **Canned archetypes are too rigid for real inputs.** 6 of 12 descriptions do
+   not fit one unchanged (M2, P3, P4, L1, L2 and by extension M4). The shared
+   assembly contract supports explicit page overrides, so the Description skill
+   now hands those variations to `shop-builder-assembly` instead of owning build
+   primitives.
 
 4. **Requests with no standard block.** P3 wants a Roadmap page; L1 and L2 want
    bundles that rotate on a schedule. Neither exists in the 15-module catalog and
