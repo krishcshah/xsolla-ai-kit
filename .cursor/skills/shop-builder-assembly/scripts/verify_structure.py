@@ -61,6 +61,9 @@ def verify(plan: dict, structure: object) -> dict:
     ):
         raise ValueError("plan pages must have string paths")
     desired_paths = [page["path"] for page in pages]
+    expected_navigation_ids = [
+        target.get("page_id") for target in plan.get("navigation", [])
+    ]
     if set(by_path) != set(desired_paths):
         errors.append(
             "page paths differ: expected "
@@ -101,6 +104,62 @@ def verify(plan: dict, structure: object) -> dict:
             if removal.get("block_id") in actual_by_id:
                 errors.append(
                     f"confirmed removal {removal.get('block_id')} still exists on {path}"
+                )
+        expected_sections = [
+            (
+                section.get("external_id"),
+                section.get("type"),
+                section.get("layout"),
+                True,
+            )
+            for section in plan.get("catalog_sections", [])
+        ]
+        for block in blocks:
+            if effective_module(block) != "newStore" or not expected_sections:
+                continue
+            actual_sections = []
+            for component in block.get("components", []):
+                section = component.get("section", {})
+                item = section.get("item", {})
+                card = component.get("card", {})
+                actual_sections.append(
+                    (
+                        item.get("group"),
+                        item.get("type"),
+                        card.get("selectedLayoutType"),
+                        component.get("enable"),
+                    )
+                )
+            if actual_sections != expected_sections:
+                errors.append(
+                    f"catalog sections differ on {path}: expected {expected_sections}, "
+                    f"got {actual_sections}"
+                )
+        header = next(
+            (block for block in blocks if effective_module(block) == "header"), None
+        )
+        if isinstance(header, dict) and expected_navigation_ids:
+            values = header.get("values", {})
+            components = values.get("components", {})
+            right = values.get("rightComponents", [])
+            actual_navigation_ids = [
+                components[component_id]
+                .get("button", {})
+                .get("action", {})
+                .get("pageId")
+                for component_id in right
+                if isinstance(components.get(component_id), dict)
+                and components[component_id].get("type") == "button"
+                and components[component_id]
+                .get("button", {})
+                .get("action", {})
+                .get("action")
+                == "page"
+            ]
+            if actual_navigation_ids != expected_navigation_ids:
+                errors.append(
+                    f"navigation differs on {path}: expected {expected_navigation_ids}, "
+                    f"got {actual_navigation_ids}"
                 )
         page_results.append(
             {"path": path, "ok": page_ok, "blocks": actual_modules}

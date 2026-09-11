@@ -69,7 +69,7 @@ project identity to approval evidence; a self-declared brief is not enough.
 | `game.lifecycle` | `launch`, `evergreen`, or `live-service`; drives event and offer defaults. |
 | `site.slug` | Existing target or requested new Xsolla domain slug. Never guess it for an existing site. |
 | `site.locales` | Full locale codes such as `en-US`; must include `primary_locale`. |
-| `catalog.groups` | Existing group identifiers or `__all__` to place in `newStore` sections. |
+| `catalog.groups` | Existing group identifiers or `__all__` to place in `newStore` sections. Each entry uses `type` = `virtual_good`, `bundle`, or `virtual_currency`, plus `placement` = `featured`, `primary`, or `secondary`; placement deterministically selects the card layout. |
 | `catalog.featured_skus` | Optional existing SKUs highlighted by the preset; assembly does not create products. |
 | `brand` | Optional `logo`, `hero_image`, color, radius, and font inputs. Missing values use preset defaults. |
 | `content` | Optional approved copy, page overrides, FAQ, requirements, event copy, and CTA labels. |

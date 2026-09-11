@@ -82,11 +82,14 @@ wrappers are reported under their effective `values.blockId` module.
   module has a UI-created exported contract. Subscriptions is documented but absent
   from the observed palette/export, while five palette entries are absent from the
   official block page.
-- The current apply script implements and reports page/block structure and requested
-  locale addition. `verify_structure.py` checks target identity, page paths, block
-  order, retained/removal IDs, locales, and unpublished state. The workflow never
-  claims that theme, navigation, copy/assets, catalog links, verification, or preview
-  completed; those phases remain blocked on authoritative patch contracts, acceptance
-  decisions, or CLI fixes.
-- Description, External Store, and Figma caller skills are tracked separately and are
-  not yet present in this repository.
+- The current apply script implements pages, navigation, blocks, requested locales,
+  and catalog-section links. Catalog sections use targeted component patches, disable
+  titles until approved localized text exists, and are re-read after each application.
+  `verify_structure.py` checks target identity, page paths, block order,
+  retained/removal IDs, navigation targets, catalog mappings, locales, and unpublished
+  state. Optional theme and copy/asset application remain blocked on stable normalized
+  input fields and final contract acceptance; CLI readiness and preview remain tracked
+  gaps.
+- The Description caller is integrated in its draft PR by producing this skill's brief
+  and removing duplicate assembly scripts. External Store and Figma caller skills are
+  tracked separately and are not yet present in this repository.

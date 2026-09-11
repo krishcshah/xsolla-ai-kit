@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
+import html
 import json
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 from render_plan import build_plan, canonical_hash, effective_module
@@ -308,6 +311,375 @@ def ensure_locales(slug: str, desired: list[str]) -> dict:
     }
 
 
+def stable_component_id(landing_id: str, page_id: str, target_path: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{landing_id}:{page_id}:{target_path}"))
+
+
+def stable_localization_id(component_id: str) -> str:
+    return "L:" + str(uuid.uuid5(uuid.NAMESPACE_URL, component_id + ":label"))
+
+
+def header_navigation_patches(
+    header: dict, landing_id: str, page_id: str, navigation: list[dict]
+) -> tuple[list[dict], dict[str, str]]:
+    values = header.get("values")
+    if not isinstance(values, dict):
+        raise RuntimeError("header values must be an object")
+    components = values.get("components")
+    if not isinstance(components, dict):
+        raise RuntimeError("header values.components must be an object")
+
+    existing_buttons = sorted(
+        key
+        for key, component in components.items()
+        if isinstance(key, str)
+        and isinstance(component, dict)
+        and component.get("type") == "button"
+    )
+    button_ids: list[str] = []
+    labels: dict[str, str] = {}
+    patches: list[dict] = []
+    for index, target in enumerate(navigation):
+        target_page_id = target.get("page_id")
+        if not isinstance(target_page_id, str):
+            raise RuntimeError("navigation target page IDs require a target-bound plan")
+        component_id = (
+            existing_buttons[index]
+            if index < len(existing_buttons)
+            else stable_component_id(landing_id, page_id, target["path"])
+        )
+        button_ids.append(component_id)
+        existing = components.get(component_id)
+        action = (
+            existing.get("button", {}).get("action", {})
+            if isinstance(existing, dict)
+            else {}
+        )
+        text = action.get("text") if isinstance(action, dict) else None
+        localization_id = text.get("id") if isinstance(text, dict) else None
+        if not isinstance(localization_id, str) or not localization_id.startswith("L:"):
+            localization_id = stable_localization_id(component_id)
+        labels[localization_id] = target["name"]
+        new_action = {
+            "__type": "action",
+            "action": "page",
+            "landingId": landing_id,
+            "openNewTab": False,
+            "pageId": target_page_id,
+            "text": {"enable": True, "id": localization_id},
+        }
+        if existing is None:
+            patches.append(
+                {
+                    "op": "add",
+                    "path": ["values", "components", component_id],
+                    "value": {
+                        "id": component_id,
+                        "type": "button",
+                        "button": {
+                            "action": new_action,
+                            "variant": {"type": "extra", "value": "header-button"},
+                        },
+                    },
+                }
+            )
+        else:
+            patches.append(
+                {
+                    "op": "replace",
+                    "path": ["values", "components", component_id, "button", "action"],
+                    "value": new_action,
+                }
+            )
+
+    for component_id in existing_buttons[len(navigation) :]:
+        patches.append(
+            {"op": "remove", "path": ["values", "components", component_id]}
+        )
+
+    for area in ("fixedComponents", "leftComponents", "rightComponents"):
+        current = values.get(area)
+        if not isinstance(current, list):
+            raise RuntimeError(f"header values.{area} must be a list")
+        retained = [item for item in current if item not in existing_buttons]
+        if area == "rightComponents":
+            retained.extend(button_ids)
+        patches.append(
+            {"op": "replace", "path": ["values", area], "value": retained}
+        )
+    return patches, labels
+
+
+def update_localized_label_scopes(
+    slug: str, labels_by_page: dict[str, dict[str, str]], locales: list[str]
+) -> None:
+    for locale in locales:
+        per_scope = {
+            page_id: {
+                localization_id: {
+                    "translation": f"<span>{html.escape(label)}</span>"
+                }
+                for localization_id, label in labels.items()
+            }
+            for page_id, labels in labels_by_page.items()
+        }
+        run_json(
+            "shopbuilder",
+            "update-many-localization",
+            "--slug",
+            slug,
+            "--data",
+            json.dumps(
+                {"locale": locale, "perScopeValues": per_scope},
+                separators=(",", ":"),
+            ),
+        )
+
+
+def apply_navigation(slug: str, landing_id: str, plan: dict) -> list[dict]:
+    current = structure(slug)
+    results: list[dict] = []
+    operations: list[dict] = []
+    labels_by_page: dict[str, dict[str, str]] = {}
+    expected_page_ids = [target["page_id"] for target in plan["navigation"]]
+    for page_plan in plan["pages"]:
+        page = page_for_path(current, page_plan["path"])
+        if page is None or not isinstance(page.get("_id"), str):
+            raise RuntimeError(f"missing page during navigation: {page_plan['path']}")
+        header = next(
+            (
+                block
+                for block in page.get("blocks", [])
+                if effective_module(block) == "header"
+            ),
+            None,
+        )
+        if not isinstance(header, dict) or not isinstance(header.get("_id"), str):
+            raise RuntimeError(f"page {page_plan['path']} has no header block")
+        patches, labels = header_navigation_patches(
+            header, landing_id, page["_id"], plan["navigation"]
+        )
+        labels_by_page[page["_id"]] = labels
+        operations.append(
+            {"path": page_plan["path"], "header_id": header["_id"], "patches": patches}
+        )
+
+    update_localized_label_scopes(slug, labels_by_page, plan["locales"])
+    for operation in operations:
+        run_json(
+            "shopbuilder",
+            "update-block",
+            "--landing-id",
+            landing_id,
+            "--data",
+            json.dumps(
+                {
+                    "navigation": {
+                        "type": "block",
+                        "id": operation["header_id"],
+                        "patches": operation["patches"],
+                    }
+                },
+                separators=(",", ":"),
+            ),
+        )
+        results.append(
+            {
+                "path": operation["path"],
+                "header_id": operation["header_id"],
+                "target_page_ids": expected_page_ids,
+            }
+        )
+
+    refreshed = structure(slug)
+    for result in results:
+        page = page_for_path(refreshed, result["path"])
+        header = next(
+            (
+                block
+                for block in page.get("blocks", [])
+                if block.get("_id") == result["header_id"]
+            ),
+            None,
+        ) if page else None
+        if not isinstance(header, dict):
+            raise RuntimeError("header disappeared during navigation verification")
+        components = header.get("values", {}).get("components", {})
+        right = header.get("values", {}).get("rightComponents", [])
+        actual_page_ids = [
+            components[component_id].get("button", {}).get("action", {}).get("pageId")
+            for component_id in right
+            if isinstance(components.get(component_id), dict)
+            and components[component_id].get("type") == "button"
+            and components[component_id]
+            .get("button", {})
+            .get("action", {})
+            .get("action")
+            == "page"
+        ]
+        if actual_page_ids != expected_page_ids:
+            raise RuntimeError(
+                f"navigation reconciliation failed on {result['path']}: {actual_page_ids}"
+            )
+    return results
+
+
+def store_section_identity(component: object) -> tuple[object, object, object, object]:
+    if not isinstance(component, dict):
+        return (None, None, None, None)
+    section = component.get("section")
+    card = component.get("card")
+    item = section.get("item") if isinstance(section, dict) else None
+    return (
+        item.get("group") if isinstance(item, dict) else None,
+        item.get("type") if isinstance(item, dict) else None,
+        card.get("selectedLayoutType") if isinstance(card, dict) else None,
+        component.get("enable"),
+    )
+
+
+def catalog_patches(components: object, sections: list[dict]) -> list[dict]:
+    """Create targeted Immer patches without replacing the components array."""
+    if not isinstance(components, list) or not components:
+        raise RuntimeError("newStore has no component template")
+    if any(not isinstance(component, dict) for component in components):
+        raise RuntimeError("newStore components must be objects")
+
+    patches: list[dict] = []
+    shared = min(len(components), len(sections))
+    for index in range(shared):
+        section = sections[index]
+        patches.extend(
+            [
+                {
+                    "op": "replace",
+                    "path": ["components", index, "enable"],
+                    "value": True,
+                },
+                {
+                    "op": "replace",
+                    "path": ["components", index, "section", "item", "autoSelected"],
+                    "value": False,
+                },
+                {
+                    "op": "replace",
+                    "path": ["components", index, "section", "item", "group"],
+                    "value": section["external_id"],
+                },
+                {
+                    "op": "replace",
+                    "path": ["components", index, "section", "item", "type"],
+                    "value": section["type"],
+                },
+                {
+                    "op": "replace",
+                    "path": ["components", index, "card", "selectedLayoutType"],
+                    "value": section["layout"],
+                },
+                {
+                    "op": "replace",
+                    "path": ["components", index, "section", "title", "enable"],
+                    "value": section["title_enabled"],
+                },
+            ]
+        )
+
+    template = components[0]
+    for index in range(shared, len(sections)):
+        section = sections[index]
+        component = copy.deepcopy(template)
+        component.pop("_id", None)
+        component["enable"] = True
+        component.setdefault("section", {}).setdefault("item", {}).update(
+            {
+                "autoSelected": False,
+                "group": section["external_id"],
+                "type": section["type"],
+            }
+        )
+        component.setdefault("section", {}).setdefault("title", {})[
+            "enable"
+        ] = section["title_enabled"]
+        component.setdefault("card", {})["selectedLayoutType"] = section["layout"]
+        patches.append(
+            {"op": "add", "path": ["components", index], "value": component}
+        )
+
+    for index in range(len(components) - 1, len(sections) - 1, -1):
+        patches.append({"op": "remove", "path": ["components", index]})
+    return patches
+
+
+def wire_catalog_sections(slug: str, landing_id: str, plan: dict) -> list[dict]:
+    if not plan["catalog_sections"]:
+        return []
+    desired = [
+        (
+            section["external_id"],
+            section["type"],
+            section["layout"],
+            True,
+        )
+        for section in plan["catalog_sections"]
+    ]
+    current = structure(slug)
+    results: list[dict] = []
+    for page_plan in plan["pages"]:
+        page = page_for_path(current, page_plan["path"])
+        if page is None:
+            raise RuntimeError(f"missing page during catalog wiring: {page_plan['path']}")
+        for block in page.get("blocks", []):
+            if effective_module(block) != "newStore":
+                continue
+            block_id = block.get("_id")
+            if not isinstance(block_id, str):
+                raise RuntimeError("newStore block has no _id")
+            patches = catalog_patches(block.get("components"), plan["catalog_sections"])
+            if patches:
+                run_json(
+                    "shopbuilder",
+                    "update-block",
+                    "--landing-id",
+                    landing_id,
+                    "--data",
+                    json.dumps(
+                        {
+                            "catalog": {
+                                "type": "block",
+                                "id": block_id,
+                                "patches": patches,
+                            }
+                        },
+                        separators=(",", ":"),
+                    ),
+                )
+            results.append(
+                {"path": page_plan["path"], "block_id": block_id, "sections": desired}
+            )
+
+    refreshed = structure(slug)
+    for result in results:
+        page = page_for_path(refreshed, result["path"])
+        block = next(
+            (
+                candidate
+                for candidate in page.get("blocks", [])
+                if candidate.get("_id") == result["block_id"]
+            ),
+            None,
+        ) if page else None
+        if block is None:
+            raise RuntimeError("newStore block disappeared during catalog verification")
+        actual = [
+            store_section_identity(component) for component in block.get("components", [])
+        ]
+        if actual != desired:
+            raise RuntimeError(
+                f"catalog reconciliation failed on {result['path']}: {actual}"
+            )
+    return results
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("brief", type=Path)
@@ -438,6 +810,8 @@ def main() -> int:
             return 0
 
         pages = [reconcile_page(slug, landing_id, page) for page in plan["pages"]]
+        navigation = apply_navigation(slug, landing_id, plan)
+        catalog_links = wire_catalog_sections(slug, landing_id, plan)
         print(
             json.dumps(
                 {
@@ -449,6 +823,8 @@ def main() -> int:
                     "landing_id": landing_id,
                     "site_existed": existed,
                     "pages": pages,
+                    "navigation": navigation,
+                    "catalog_links": catalog_links,
                     "locales": locales,
                     "completed_phases": plan["implemented_phases"],
                     "pending_phases": plan["unsupported_phases"],

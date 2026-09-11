@@ -13,6 +13,7 @@ PRESETS = {"auto", "mobile-single-page", "pc-multi-page", "live-service-events"}
 PLATFORMS = {"mobile", "pc", "console", "web"}
 LIFECYCLES = {"launch", "evergreen", "live-service"}
 GROUP_TYPES = {"virtual_good", "bundle", "virtual_currency"}
+PLACEMENTS = {"primary", "featured", "secondary"}
 VERIFIED_BLOCK_MODULES = {
     "header",
     "leadGameSales",
@@ -171,6 +172,12 @@ def validate(brief: dict) -> list[str]:
                     )
                 else:
                     seen.add(identity)
+            placement = group.get("placement")
+            if not isinstance(placement, str) or placement not in PLACEMENTS:
+                errors.append(
+                    f"catalog.groups[{index}].placement must use: "
+                    + ", ".join(sorted(PLACEMENTS))
+                )
 
     featured_skus = catalog.get("featured_skus", [])
     if not isinstance(featured_skus, list) or any(

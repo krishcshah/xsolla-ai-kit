@@ -41,6 +41,11 @@ project overrides after preflight.
 - Page theme overrides site theme; apply brand colors to both layers.
 - Block text is stored in localization, not directly in block values.
 - A new `newStore` section title must be localized before its `L:` ID is enabled.
+- Reconcile `newStore` sections with index-targeted patches. Update existing section
+  leaves, append only the missing component indices, and remove stale indices from the
+  end. Do not replace the complete `components` array. When approved localized titles
+  are unavailable, keep each section title disabled rather than reusing a misleading
+  template title.
 
 ## Known gaps to track
 

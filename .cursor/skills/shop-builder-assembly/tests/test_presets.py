@@ -125,6 +125,20 @@ class PresetTests(unittest.TestCase):
         self.assertNotIn("newStore", plan["pages"][0]["blocks"])
         self.assertIn("newStore", {item["module"] for item in plan["omissions"]})
 
+    def test_catalog_sections_receive_deterministic_layouts(self) -> None:
+        self.brief["catalog"]["groups"] = [
+            {"external_id": "featured", "type": "bundle", "placement": "featured"},
+            {"external_id": "main", "type": "virtual_good", "placement": "primary"},
+            {"external_id": "more", "type": "virtual_good", "placement": "secondary"},
+        ]
+        plan = render_plan.build_plan(self.brief)
+        self.assertEqual(
+            ["featured", "vertical", "horizontal"],
+            [section["layout"] for section in plan["catalog_sections"]],
+        )
+        self.assertIn("catalog_links", plan["implemented_phases"])
+        self.assertNotIn("catalog_links", plan["unsupported_phases"])
+
     def test_existing_block_without_replacement_data_is_preserved(self) -> None:
         self.brief["content"].pop("faq", None)
         structure = {

@@ -126,6 +126,25 @@ def missing_data_reason(module: str, brief: dict) -> str | None:
     return None
 
 
+def catalog_sections(brief: dict, preset: str) -> list[dict]:
+    """Return render-safe store sections with deterministic card layouts."""
+    sections = []
+    for group in brief["catalog"]["groups"]:
+        placement = group["placement"]
+        if placement == "featured":
+            layout = "featured"
+        elif placement == "secondary":
+            layout = "horizontal"
+        elif preset == "pc-multi-page" and group["type"] == "bundle":
+            layout = "large"
+        elif preset == "live-service-events" and group["type"] == "virtual_currency":
+            layout = "horizontal"
+        else:
+            layout = "vertical"
+        sections.append({**group, "layout": layout, "title_enabled": False})
+    return sections
+
+
 def omit_unwritable_blocks(
     pages: list[dict], brief: dict
 ) -> tuple[list[dict], list[dict]]:
@@ -155,6 +174,7 @@ def bind_current_state(
 ) -> dict:
     if structure is None:
         for page in pages:
+            page["page_id"] = None
             page["current_blocks"] = []
             page["preserved_blocks"] = []
             page["removals"] = []
@@ -190,12 +210,14 @@ def bind_current_state(
             )
 
     for page_plan in pages:
+        page_plan["page_id"] = None
         page_plan["current_blocks"] = []
         page_plan["preserved_blocks"] = []
         page_plan["removals"] = []
         current_page = by_path.get(page_plan["path"])
         if current_page is None:
             continue
+        page_plan["page_id"] = current_page.get("_id")
         blocks = current_page.get("blocks", [])
         if not isinstance(blocks, list) or any(
             not isinstance(block, dict) for block in blocks
@@ -263,7 +285,7 @@ def bind_current_state(
 
 def build_plan(brief: dict, current_structure: object | None = None) -> dict:
     preset = choose_preset(brief)
-    catalog_groups = brief["catalog"]["groups"]
+    catalog_groups = catalog_sections(brief, preset)
     pages, omissions = omit_unwritable_blocks(selected_pages(brief, preset), brief)
     current_state = bind_current_state(pages, omissions, current_structure)
     warnings = []
@@ -303,7 +325,10 @@ def build_plan(brief: dict, current_structure: object | None = None) -> dict:
             "preview",
         ],
         "pages": pages,
-        "navigation": [{"name": page["name"], "path": page["path"]} for page in pages],
+        "navigation": [
+            {"name": page["name"], "path": page["path"], "page_id": page["page_id"]}
+            for page in pages
+        ],
         "locales": brief["site"]["locales"],
         "primary_locale": brief["site"]["primary_locale"],
         "catalog_sections": catalog_groups,
@@ -314,12 +339,16 @@ def build_plan(brief: dict, current_structure: object | None = None) -> dict:
         "omissions": omissions,
         "current_state": current_state,
         "brief_sha256": canonical_hash(brief),
-        "implemented_phases": ["pages", "blocks", "locales"],
+        "implemented_phases": [
+            "pages",
+            "navigation",
+            "blocks",
+            "locales",
+            "catalog_links",
+        ],
         "unsupported_phases": [
             "theme",
-            "navigation",
             "copy_assets",
-            "catalog_links",
             "verify",
             "preview",
         ],

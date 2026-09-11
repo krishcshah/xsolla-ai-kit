@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import importlib.util
 import json
@@ -218,11 +219,201 @@ class ApplyPlanTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "locale reconciliation"):
                 apply_plan.ensure_locales("shop", ["en-US", "de-DE"])
 
+    def test_header_navigation_reuses_buttons_and_targets_pages(self) -> None:
+        header = {
+            "values": {
+                "components": {
+                    "button-a": {
+                        "id": "button-a",
+                        "type": "button",
+                        "button": {
+                            "action": {
+                                "action": "scroll",
+                                "targetId": "old",
+                                "text": {"enable": True, "id": "L:existing"},
+                            },
+                            "variant": {"type": "extra", "value": "header-button"},
+                        },
+                    },
+                    "locale": {"id": "locale", "type": "locale-select"},
+                },
+                "fixedComponents": [],
+                "leftComponents": ["button-a"],
+                "rightComponents": ["locale"],
+            }
+        }
+        patches, labels = apply_plan.header_navigation_patches(
+            header,
+            "landing",
+            "home",
+            [
+                {"name": "Home", "path": "/", "page_id": "home"},
+                {"name": "Store", "path": "/store", "page_id": "store"},
+            ],
+        )
+        action_patch = next(
+            patch
+            for patch in patches
+            if patch["path"]
+            == ["values", "components", "button-a", "button", "action"]
+        )
+        self.assertEqual("page", action_patch["value"]["action"])
+        self.assertEqual("home", action_patch["value"]["pageId"])
+        self.assertEqual("Home", labels["L:existing"])
+        addition = next(
+            patch
+            for patch in patches
+            if patch["op"] == "add" and patch["path"][:2] == ["values", "components"]
+        )
+        self.assertEqual("store", addition["value"]["button"]["action"]["pageId"])
+        right_patch = next(
+            patch for patch in patches if patch["path"] == ["values", "rightComponents"]
+        )
+        self.assertEqual("locale", right_patch["value"][0])
+        self.assertEqual(3, len(right_patch["value"]))
+
+    def test_navigation_component_ids_are_stable(self) -> None:
+        first = apply_plan.stable_component_id("landing", "home", "/store")
+        second = apply_plan.stable_component_id("landing", "home", "/store")
+        self.assertEqual(first, second)
+
+    def test_catalog_patches_are_targeted_and_remove_stale_sections(self) -> None:
+        components = [
+            {
+                "_id": "first",
+                "enable": True,
+                "section": {
+                    "item": {"autoSelected": True, "group": "old", "type": "bundle"},
+                    "title": {"enable": True, "id": "L:old"},
+                },
+                "card": {"selectedLayoutType": "featured"},
+            },
+            {
+                "_id": "stale",
+                "enable": True,
+                "section": {
+                    "item": {"autoSelected": False, "group": "stale", "type": "bundle"},
+                    "title": {"enable": True, "id": "L:stale"},
+                },
+                "card": {"selectedLayoutType": "featured"},
+            },
+        ]
+        patches = apply_plan.catalog_patches(
+            components,
+            [
+                {
+                    "external_id": "__all__",
+                    "type": "virtual_currency",
+                    "layout": "vertical",
+                    "title_enabled": False,
+                }
+            ],
+        )
+        self.assertFalse(any(patch["path"] == ["components"] for patch in patches))
+        self.assertIn(
+            {"op": "remove", "path": ["components", 1]},
+            patches,
+        )
+        self.assertIn(
+            {
+                "op": "replace",
+                "path": ["components", 0, "section", "item", "group"],
+                "value": "__all__",
+            },
+            patches,
+        )
+
+    def test_catalog_patches_add_from_sanitized_template(self) -> None:
+        components = [
+            {
+                "_id": "template-id",
+                "enable": True,
+                "section": {
+                    "item": {"autoSelected": True, "group": "old", "type": "bundle"},
+                    "title": {"enable": True, "id": "L:old"},
+                },
+                "card": {"selectedLayoutType": "featured"},
+            }
+        ]
+        sections = [
+            {"external_id": "one", "type": "bundle", "layout": "featured", "title_enabled": False},
+            {"external_id": "two", "type": "virtual_good", "layout": "vertical", "title_enabled": False},
+        ]
+        patches = apply_plan.catalog_patches(components, sections)
+        addition = next(patch for patch in patches if patch["op"] == "add")
+        self.assertNotIn("_id", addition["value"])
+        self.assertEqual("two", addition["value"]["section"]["item"]["group"])
+
+    def test_wire_catalog_sections_verifies_result(self) -> None:
+        before = {
+            "pages": [
+                {
+                    "path": "/",
+                    "blocks": [
+                        {
+                            "_id": "store",
+                            "module": "newStore",
+                            "components": [
+                                {
+                                    "enable": True,
+                                    "section": {
+                                        "item": {"autoSelected": True, "group": "old", "type": "bundle"},
+                                        "title": {"enable": True},
+                                    },
+                                    "card": {"selectedLayoutType": "featured"},
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        after = copy.deepcopy(before)
+        component = after["pages"][0]["blocks"][0]["components"][0]
+        component["section"]["item"] = {
+            "autoSelected": False,
+            "group": "__all__",
+            "type": "virtual_currency",
+        }
+        component["section"]["title"]["enable"] = False
+        component["card"]["selectedLayoutType"] = "vertical"
+        plan = {
+            "pages": [{"path": "/"}],
+            "catalog_sections": [
+                {
+                    "external_id": "__all__",
+                    "type": "virtual_currency",
+                    "layout": "vertical",
+                    "title_enabled": False,
+                }
+            ],
+        }
+        with (
+            mock.patch.object(apply_plan, "structure", side_effect=[before, after]),
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.wire_catalog_sections("shop", "landing", plan)
+        run_json.assert_called_once()
+        self.assertEqual("store", result[0]["block_id"])
+
+    def test_empty_catalog_preserves_existing_store_configuration(self) -> None:
+        with (
+            mock.patch.object(apply_plan, "structure") as structure,
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.wire_catalog_sections(
+                "shop", "landing", {"catalog_sections": [], "pages": []}
+            )
+        self.assertEqual([], result)
+        structure.assert_not_called()
+        run_json.assert_not_called()
+
     def test_structure_verifier_accepts_matching_unpublished_site(self) -> None:
         plan = {
             "confirmation_id": "sha256:test",
             "target": {"merchant_id": 100, "project_id": 200, "slug": "shop"},
             "locales": ["en-US"],
+            "catalog_sections": [],
             "pages": [
                 {
                     "path": "/",
@@ -255,6 +446,92 @@ class ApplyPlanTests(unittest.TestCase):
         result = verify_structure.verify(plan, structure)
         self.assertTrue(result["ok"])
         self.assertFalse(result["published"])
+
+    def test_structure_verifier_checks_catalog_sections(self) -> None:
+        plan = {
+            "target": {"merchant_id": 100, "project_id": 200, "slug": "shop"},
+            "locales": ["en-US"],
+            "catalog_sections": [
+                {
+                    "external_id": "__all__",
+                    "type": "virtual_currency",
+                    "layout": "vertical",
+                }
+            ],
+            "pages": [{"path": "/", "blocks": ["newStore"]}],
+        }
+        structure = {
+            "merchantId": 100,
+            "projectId": 200,
+            "domain": "shop",
+            "type": "store",
+            "published": None,
+            "languages": ["en-US"],
+            "pages": [
+                {
+                    "path": "/",
+                    "blocks": [
+                        {
+                            "_id": "store",
+                            "module": "newStore",
+                            "components": [
+                                {
+                                    "enable": True,
+                                    "section": {"item": {"group": "wrong", "type": "bundle"}},
+                                    "card": {"selectedLayoutType": "featured"},
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        result = verify_structure.verify(plan, structure)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("catalog sections differ" in error for error in result["errors"]))
+
+    def test_structure_verifier_checks_internal_navigation(self) -> None:
+        plan = {
+            "target": {"merchant_id": 100, "project_id": 200, "slug": "shop"},
+            "locales": ["en-US"],
+            "catalog_sections": [],
+            "navigation": [{"name": "Home", "path": "/", "page_id": "home"}],
+            "pages": [{"path": "/", "blocks": ["header"]}],
+        }
+        structure = {
+            "merchantId": 100,
+            "projectId": 200,
+            "domain": "shop",
+            "type": "store",
+            "published": None,
+            "languages": ["en-US"],
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [
+                        {
+                            "_id": "header",
+                            "module": "header",
+                            "values": {
+                                "rightComponents": ["home-link"],
+                                "components": {
+                                    "home-link": {
+                                        "type": "button",
+                                        "button": {
+                                            "action": {"action": "page", "pageId": "wrong"}
+                                        },
+                                    }
+                                },
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+        result = verify_structure.verify(plan, structure)
+        self.assertFalse(result["ok"])
+        self.assertTrue(any("navigation differs" in error for error in result["errors"]))
 
     def test_structure_verifier_reports_order_and_publication(self) -> None:
         plan = {

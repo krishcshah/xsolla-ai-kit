@@ -205,6 +205,14 @@ class ShopBriefTests(unittest.TestCase):
         )
         self.assertEqual([], validator.validate(brief))
 
+    def test_catalog_group_placement_is_validated(self) -> None:
+        brief = copy.deepcopy(self.brief)
+        brief["catalog"]["groups"][0]["placement"] = "somewhere"
+        self.assertIn(
+            "catalog.groups[0].placement must use: featured, primary, secondary",
+            validator.validate(brief),
+        )
+
     def test_preflight_helpers_do_not_expose_account_login(self) -> None:
         accounts = {
             "ok": True,
