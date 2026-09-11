@@ -19,6 +19,8 @@ Coverage: **24/24 official entries documented (100%)**. Mapping coverage is **23
 Subscriptions remains a gap. Catalog and preset recommendations still require the
 designated reviewer to approve them.
 
+Tracked inventory reconciliation: [SB-8990](https://xsolla.atlassian.net/browse/SB-8990).
+
 ## Official inventory mapping
 
 | Official block | Template/module | Purpose and when to use | Required publisher data | Status |
@@ -65,6 +67,8 @@ contracts before presets may use them.
 The older CLI guidance names `lead` and `federated`; neither appears in the current
 palette, which exposes `leadGameSales` and `fast-login`. Treat the older names as a
 version/documentation gap, not as aliases, until an export proves otherwise.
+CLI discovery/versioning is tracked in
+[SB-8991](https://xsolla.atlassian.net/browse/SB-8991).
 
 ## Safe use rule
 

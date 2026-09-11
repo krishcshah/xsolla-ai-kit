@@ -25,12 +25,15 @@ from committed evidence.
    valid `xsolla auth login` token can stop yielding a cookie after one or more
    commands, and repeated supported logins eventually caused HTTP 429. The CLI needs
    a secure cached Shop Builder session or another non-manual multi-command flow.
+   Tracked in [SB-8960](https://xsolla.atlassian.net/browse/SB-8960).
 2. `verify-website --slug ...` returned HTTP 400 because the generated request omitted
    required `draftPagesIds` (request ID `6ac16aca0642a5f39b62dfb9045c4d77`).
+   Tracked in [SB-8961](https://xsolla.atlassian.net/browse/SB-8961).
 3. `enable-preview` and `preview-link` returned `admin_privileges_requred` for a
    Publisher Account project owner, while the same user could open Preview in the
    Publisher Account editor. Request IDs: `a361329b109800eaed7a48856185fe7b`
-   and `146f3c9438cacf66102e1031434f5033`.
+   and `146f3c9438cacf66102e1031434f5033`. Tracked in
+   [SB-8962](https://xsolla.atlassian.net/browse/SB-8962).
 
 Do not work around these gaps by copying `pa-v4-token` from browser storage. Continue
 to use `xsolla auth login` and link the CLI tickets to SB-8796.

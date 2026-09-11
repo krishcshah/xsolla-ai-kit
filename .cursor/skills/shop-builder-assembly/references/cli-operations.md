@@ -53,6 +53,9 @@ from the official page; and the older CLI guidance names `lead`/`federated` inst
 the current `leadGameSales`/`fast-login` entries. Track these as linked gaps rather
 than guessing aliases.
 
+- Inventory/UI reconciliation: [SB-8990](https://xsolla.atlassian.net/browse/SB-8990)
+- CLI module and contract discovery: [SB-8991](https://xsolla.atlassian.net/browse/SB-8991)
+
 The first dedicated-project run also found defects in Publisher-session reuse,
 `verify-website`, and CLI preview authorization. See
 [`test-findings.md`](test-findings.md) for reproducible evidence and request IDs.
