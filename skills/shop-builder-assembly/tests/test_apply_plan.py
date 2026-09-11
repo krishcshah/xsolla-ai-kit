@@ -26,6 +26,19 @@ def load_apply_plan():
 apply_plan = load_apply_plan()
 
 
+def load_verify_structure():
+    path = ROOT / "scripts" / "verify_structure.py"
+    spec = importlib.util.spec_from_file_location("verify_structure_for_tests", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+verify_structure = load_verify_structure()
+
+
 class ApplyPlanTests(unittest.TestCase):
     def test_website_exists_handles_wrapped_lists(self) -> None:
         response = {
@@ -136,6 +149,87 @@ class ApplyPlanTests(unittest.TestCase):
         with mock.patch.object(apply_plan.subprocess, "run", return_value=failed):
             with self.assertRaisesRegex(RuntimeError, "wrong project"):
                 apply_plan.run_preflight(Path("brief.json"), None)
+
+    def test_ensure_locales_adds_only_missing_languages(self) -> None:
+        before = {"languages": ["en-US"]}
+        after = {"languages": ["en-US", "de-DE"]}
+        with (
+            mock.patch.object(apply_plan, "structure", side_effect=[before, after]),
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.ensure_locales("shop", ["en-US", "de-DE"])
+        run_json.assert_called_once_with(
+            "shopbuilder", "add-language", "--slug", "shop", "--language", "de-DE"
+        )
+        self.assertEqual(["de-DE"], result["added"])
+
+    def test_structure_verifier_accepts_matching_unpublished_site(self) -> None:
+        plan = {
+            "confirmation_id": "sha256:test",
+            "target": {"merchant_id": 100, "project_id": 200, "slug": "shop"},
+            "locales": ["en-US"],
+            "pages": [
+                {
+                    "path": "/",
+                    "blocks": ["header", "footer"],
+                    "preserved_blocks": [],
+                    "removals": [],
+                }
+            ],
+        }
+        structure = {
+            "ok": True,
+            "data": {
+                "merchantId": "100",
+                "projectId": "200",
+                "domain": "shop",
+                "type": "store",
+                "published": None,
+                "languages": ["en-US"],
+                "pages": [
+                    {
+                        "path": "/",
+                        "blocks": [
+                            {"_id": "header", "module": "header"},
+                            {"_id": "footer", "module": "footer"},
+                        ],
+                    }
+                ],
+            },
+        }
+        result = verify_structure.verify(plan, structure)
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["published"])
+
+    def test_structure_verifier_reports_order_and_publication(self) -> None:
+        plan = {
+            "target": {"merchant_id": 100, "project_id": 200, "slug": "shop"},
+            "locales": ["en-US"],
+            "pages": [{"path": "/", "blocks": ["header", "footer"]}],
+        }
+        structure = {
+            "merchantId": 100,
+            "projectId": 200,
+            "domain": "shop",
+            "type": "store",
+            "published": 1,
+            "languages": ["en-US"],
+            "pages": [
+                {
+                    "path": "/",
+                    "blocks": [
+                        {"_id": "footer", "module": "footer"},
+                        {"_id": "header", "module": "header"},
+                    ],
+                }
+            ],
+        }
+        result = verify_structure.verify(plan, structure)
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["published"])
+        self.assertTrue(
+            any("block order differs" in error for error in result["errors"])
+        )
 
 
 if __name__ == "__main__":

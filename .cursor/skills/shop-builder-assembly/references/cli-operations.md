@@ -56,3 +56,7 @@ The first dedicated-project run also found defects in Publisher-session reuse,
 The CLI does not expose page deletion. If an existing target contains paths outside
 the confirmed plan, stop before writes and report the extra paths instead of leaving
 a silently mixed preset or deleting the whole website.
+
+Use `scripts/verify_structure.py` for the deterministic portion of verification. It
+does not replace `verify-website`, localization/catalog checks, or visual preview; it
+isolates structural failures from the currently tracked CLI readiness/preview defects.

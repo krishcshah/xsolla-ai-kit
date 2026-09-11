@@ -48,7 +48,14 @@ from a normalized JSON shop brief.
    same re-backup/reconfirmation boundary after those paths are created.
 
 5. Follow the confirmed assembly sequence in `SKILL.md`; verify and preview, but do
-   not publish.
+   not publish. Export a fresh post-apply structure and compare it with the exact
+   confirmed plan:
+
+   ```bash
+   python3 scripts/verify_structure.py \
+     --plan ./artifacts/confirmed-plan.json \
+     --structure ./artifacts/post-apply/structure.json
+   ```
 6. For formal runs, append the result using `references/evaluation.md` and check the
    metrics with `scripts/summarize_evals.py`.
 
@@ -66,8 +73,11 @@ from a normalized JSON shop brief.
   have confirmed defects captured in `references/test-findings.md`.
 - The CLI has no page-deletion command. Application stops before writes when an
   existing target contains pages outside the confirmed plan.
-- The current apply script implements and reports only page/block structure. It never
+- The current apply script implements and reports page/block structure and requested
+  locale addition. `verify_structure.py` checks target identity, page paths, block
+  order, retained/removal IDs, locales, and unpublished state. The workflow never
   claims that theme, navigation, copy/assets, catalog links, verification, or preview
-  completed; those phases remain blocked on authoritative patch contracts or CLI fixes.
+  completed; those phases remain blocked on authoritative patch contracts, acceptance
+  decisions, or CLI fixes.
 - Description, External Store, and Figma caller skills are tracked separately and are
   not yet present in this repository.

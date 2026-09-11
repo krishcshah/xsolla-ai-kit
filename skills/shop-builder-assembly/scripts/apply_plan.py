@@ -279,6 +279,33 @@ def add_missing_pages(slug: str, page_plans: list[dict]) -> list[str]:
     return created
 
 
+def ensure_locales(slug: str, desired: list[str]) -> dict:
+    current = structure(slug)
+    languages = current.get("languages")
+    if not isinstance(languages, list) or any(
+        not isinstance(language, str) for language in languages
+    ):
+        raise RuntimeError("get-structure returned an invalid languages list")
+    added: list[str] = []
+    for locale in desired:
+        if locale in languages:
+            continue
+        run_json("shopbuilder", "add-language", "--slug", slug, "--language", locale)
+        added.append(locale)
+        languages.append(locale)
+    refreshed = structure(slug)
+    final_languages = refreshed.get("languages")
+    if not isinstance(final_languages, list) or any(
+        locale not in final_languages for locale in desired
+    ):
+        raise RuntimeError("locale reconciliation did not produce every requested locale")
+    return {
+        "requested": desired,
+        "added": added,
+        "preserved_extra": sorted(set(final_languages) - set(desired)),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("brief", type=Path)
@@ -361,6 +388,7 @@ def main() -> int:
             raise RuntimeError("landing has no _id")
 
         created_pages = add_missing_pages(slug, plan["pages"])
+        locales = ensure_locales(slug, plan["locales"])
         if not existed:
             print(
                 json.dumps(
@@ -372,6 +400,7 @@ def main() -> int:
                         "slug": slug,
                         "landing_id": landing_id,
                         "created_pages": created_pages,
+                        "locales": locales,
                         "next_action": (
                             "Back up the generated site, render a target-bound plan, "
                             "and explicitly confirm its exact removals before reconciliation."
@@ -394,6 +423,7 @@ def main() -> int:
                         "slug": slug,
                         "landing_id": landing_id,
                         "created_pages": created_pages,
+                        "locales": locales,
                         "next_action": (
                             "Back up the changed site, re-render its generated block IDs, "
                             "and explicitly confirm before block reconciliation."
@@ -417,6 +447,7 @@ def main() -> int:
                     "landing_id": landing_id,
                     "site_existed": existed,
                     "pages": pages,
+                    "locales": locales,
                     "completed_phases": plan["implemented_phases"],
                     "pending_phases": plan["unsupported_phases"],
                     "published": False,

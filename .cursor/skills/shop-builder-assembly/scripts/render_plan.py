@@ -304,7 +304,7 @@ def build_plan(brief: dict, current_structure: object | None = None) -> dict:
         "omissions": omissions,
         "current_state": current_state,
         "brief_sha256": canonical_hash(brief),
-        "implemented_phases": ["pages", "blocks"],
+        "implemented_phases": ["pages", "blocks", "locales"],
         "unsupported_phases": [
             "theme",
             "navigation",

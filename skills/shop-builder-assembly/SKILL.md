@@ -94,7 +94,9 @@ SB-8796.
 
 ## Verification and handoff
 
-- Re-read structure and localization after assembly; compare them with the plan.
+- Re-read structure and localization after assembly. Run
+  `scripts/verify_structure.py --plan <confirmed-plan.json> --structure
+  <post-apply-structure.json>` for the deterministic structural comparison.
 - Check every requested locale, page path, navigation target, block order, catalog
   group, and asset URL.
 - Run `xsolla shopbuilder verify-website --slug <slug>`.
