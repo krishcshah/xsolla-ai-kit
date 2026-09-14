@@ -10,10 +10,11 @@ import html
 import json
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 
-from render_plan import build_plan, canonical_hash, effective_module
+from render_plan import build_plan, effective_module, structure_data, structure_hash
 from validate_shop_brief import VERIFIED_BLOCK_MODULES, load_brief, validate
 
 BACKUP_FILE_NAMES = {
@@ -25,13 +26,44 @@ BACKUP_FILE_NAMES = {
     "assets.json",
     "versions.json",
 }
+SESSION_BOOTSTRAP_RETRY_DELAYS = (5, 10, 20)
 
 
 def run_json(*args: str) -> object:
     command = ["xsolla", *args, "--json"]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
-    if result.returncode:
+    rate_limit_attempt = 0
+    refreshed_login = False
+    while True:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        if not result.returncode:
+            break
         detail = result.stderr.strip() or result.stdout.strip()
+        retryable_bootstrap_limit = (
+            "publisher session bootstrap" in detail and "HTTP 429" in detail
+        )
+        if retryable_bootstrap_limit and rate_limit_attempt < len(
+            SESSION_BOOTSTRAP_RETRY_DELAYS
+        ):
+            time.sleep(SESSION_BOOTSTRAP_RETRY_DELAYS[rate_limit_attempt])
+            rate_limit_attempt += 1
+            continue
+        missing_bootstrap_cookie = (
+            "publisher session bootstrap did not yield" in detail
+        )
+        if missing_bootstrap_cookie and not refreshed_login:
+            login = subprocess.run(
+                ["xsolla", "auth", "login"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if login.returncode:
+                login_detail = login.stderr.strip() or login.stdout.strip()
+                raise RuntimeError(
+                    "supported Publisher login refresh failed: " + login_detail
+                )
+            refreshed_login = True
+            continue
         if "publisher session bootstrap" in detail:
             detail += (
                 "; refresh the supported Publisher login with `xsolla auth login` "
@@ -118,7 +150,8 @@ def verified_backup(path: Path, expected: dict, slug: str) -> bool:
 
 def backup_structure(path: Path) -> object:
     try:
-        return json.loads((path / "structure.json").read_text(encoding="utf-8"))
+        value = json.loads((path / "structure.json").read_text(encoding="utf-8"))
+        return structure_data(value)
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"cannot read backup structure: {exc}") from exc
 
@@ -190,17 +223,33 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
             "current page requires unconfirmed block removals; back up, re-render, "
             f"and reconfirm the plan ({details})"
         )
-    for block in removals:
+    if removals:
+        removal_ids = {block["_id"] for block in removals}
+        removal_indexes = sorted(
+            (
+                index
+                for index, block in enumerate(blocks)
+                if block.get("_id") in removal_ids
+            ),
+            reverse=True,
+        )
+        removal_payload = {
+            "removeBlocks": {
+                "type": "page",
+                "id": page_id,
+                "patches": [
+                    {"op": "remove", "path": ["blocks", index]}
+                    for index in removal_indexes
+                ],
+            }
+        }
         run_json(
             "shopbuilder",
-            "delete-block",
+            "update-block",
             "--landing-id",
             landing_id,
-            "--page-id",
-            page_id,
-            "--blockid",
-            block["_id"],
-            "--force",
+            "--data",
+            json.dumps(removal_payload, sort_keys=True, separators=(",", ":")),
         )
 
     page = page_for_path(structure(slug), page_plan["path"])
@@ -724,7 +773,7 @@ def main() -> int:
 
         if existed:
             current = structure(slug)
-            if canonical_hash(current) != plan["current_state"]["structure_sha256"]:
+            if structure_hash(current) != structure_hash(saved_structure):
                 raise RuntimeError(
                     "target structure changed after backup; back up, re-render, and reconfirm"
                 )

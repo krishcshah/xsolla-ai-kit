@@ -81,6 +81,40 @@ def canonical_hash(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def stable_structure(value: object) -> object:
+    """Remove only API-generated component IDs from a structure fingerprint.
+
+    Shop Builder regenerates the ``_id`` of entries inside ``components`` arrays on
+    every read. Those IDs cannot be used for optimistic concurrency because two
+    consecutive reads of an unchanged site differ. Page and block IDs remain in the
+    fingerprint, as do every component value and localization reference.
+    """
+
+    if isinstance(value, list):
+        return [stable_structure(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    normalized = {}
+    for key, item in value.items():
+        if key == "components" and isinstance(item, list):
+            normalized[key] = [
+                stable_structure(
+                    {child_key: child_value for child_key, child_value in component.items() if child_key != "_id"}
+                )
+                if isinstance(component, dict)
+                else stable_structure(component)
+                for component in item
+            ]
+        else:
+            normalized[key] = stable_structure(item)
+    return normalized
+
+
+def structure_hash(value: object) -> str:
+    return canonical_hash(stable_structure(value))
+
+
 def structure_data(value: object) -> dict:
     if isinstance(value, dict) and value.get("ok") is True and "data" in value:
         value = value["data"]

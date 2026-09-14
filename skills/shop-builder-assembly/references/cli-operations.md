@@ -14,13 +14,19 @@ project overrides after preflight.
 | Bootstrap | `create-website --type topup` | Name, slug | Empty landing with `type:null` |
 | Bootstrap | `set-landing-type --type store` | Slug | Configured webshop landing |
 | Pages | `add-page` | Slug, name, path | Page with default template blocks |
-| Blocks | `add-block`, `move-block`, `delete-block` | Landing/page/block IDs | Ordered page block list |
+| Blocks | `add-block`, `move-block`, and page-scoped `update-block` removal patches | Landing/page/block IDs | Ordered page block list |
 | Theme | `update-block` with `type:site` and `type:page` | Landing/page IDs, targeted patches | Site and page source themes |
 | Assets | `upload-asset` | Landing ID, local file | Permanent CDN URL |
 | Copy | `add-language`, `update-localization`, `update-many-localization` | Slug, page and `L:` IDs | Localized HTML |
 | Catalog | `update-block` on `newStore.components` | Same-project group IDs | Store sections |
 | Verify | `get-structure`, `get-localization`, `verify-website` | Slug | Plan comparison and readiness result |
 | Preview | `enable-preview`, `preview-link` | Slug | Human-reviewable preview only |
+
+If an authenticated command reports that Publisher session bootstrap produced no
+session cookie before the operation was issued, `apply_plan.py` performs one bounded
+refresh through `xsolla auth login` and retries that command. It never reads a browser
+cookie, never accepts a manually copied PA token, and does not retry ambiguous API
+operation failures. Session-bootstrap HTTP 429 responses use bounded backoff.
 
 ## ID dependencies
 

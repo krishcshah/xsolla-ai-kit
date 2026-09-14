@@ -41,6 +41,85 @@ verify_structure = load_verify_structure()
 
 
 class ApplyPlanTests(unittest.TestCase):
+    def test_backup_structure_unwraps_cli_envelope(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = {"_id": "landing", "pages": []}
+            (root / "structure.json").write_text(
+                json.dumps({"ok": True, "data": expected}), encoding="utf-8"
+            )
+            self.assertEqual(expected, apply_plan.backup_structure(root))
+
+    def test_structure_hash_ignores_volatile_component_ids(self) -> None:
+        first = {
+            "pages": [
+                {
+                    "_id": "page-id",
+                    "blocks": [
+                        {
+                            "_id": "block-id",
+                            "values": {
+                                "components": [
+                                    {"_id": "generated-one", "external_id": "group-1"}
+                                ]
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        second = copy.deepcopy(first)
+        second["pages"][0]["blocks"][0]["values"]["components"][0]["_id"] = (
+            "generated-two"
+        )
+        self.assertEqual(
+            apply_plan.structure_hash(first), apply_plan.structure_hash(second)
+        )
+
+    def test_structure_hash_keeps_page_block_and_component_values(self) -> None:
+        original = {
+            "pages": [
+                {
+                    "_id": "page-id",
+                    "blocks": [
+                        {
+                            "_id": "block-id",
+                            "values": {
+                                "components": [
+                                    {"_id": "generated", "external_id": "group-1"}
+                                ]
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        for path, replacement in (
+            (("pages", 0, "_id"), "other-page"),
+            (("pages", 0, "blocks", 0, "_id"), "other-block"),
+            (
+                (
+                    "pages",
+                    0,
+                    "blocks",
+                    0,
+                    "values",
+                    "components",
+                    0,
+                    "external_id",
+                ),
+                "group-2",
+            ),
+        ):
+            changed = copy.deepcopy(original)
+            target = changed
+            for segment in path[:-1]:
+                target = target[segment]
+            target[path[-1]] = replacement
+            self.assertNotEqual(
+                apply_plan.structure_hash(original), apply_plan.structure_hash(changed)
+            )
+
     def test_website_exists_handles_wrapped_lists(self) -> None:
         response = {
             "ok": True,
@@ -143,6 +222,66 @@ class ApplyPlanTests(unittest.TestCase):
                 apply_plan.reconcile_page("shop", "landing", plan)
             run_json.assert_not_called()
 
+    def test_reconciliation_batches_confirmed_removals_in_descending_order(self) -> None:
+        current = {
+            "_id": "landing",
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [
+                        {"_id": "header", "module": "header"},
+                        {"_id": "remove-one", "module": "packs"},
+                        {"_id": "remove-two", "module": "gallery"},
+                        {"_id": "footer", "module": "footer"},
+                    ],
+                }
+            ],
+        }
+        final = {
+            "_id": "landing",
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [
+                        {"_id": "header", "module": "header"},
+                        {"_id": "footer", "module": "footer"},
+                    ],
+                }
+            ],
+        }
+        plan = {
+            "name": "Home",
+            "path": "/",
+            "blocks": ["header", "footer"],
+            "removals": [
+                {"block_id": "remove-one", "module": "packs"},
+                {"block_id": "remove-two", "module": "gallery"},
+            ],
+        }
+        with (
+            mock.patch.object(
+                apply_plan,
+                "structure",
+                side_effect=[current, final, final, final, final],
+            ),
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.reconcile_page("shop", "landing", plan)
+        run_json.assert_called_once()
+        args = run_json.call_args.args
+        self.assertEqual("update-block", args[1])
+        payload = json.loads(args[-1])
+        self.assertEqual(
+            [
+                {"op": "remove", "path": ["blocks", 2]},
+                {"op": "remove", "path": ["blocks", 1]},
+            ],
+            payload["removeBlocks"]["patches"],
+        )
+        self.assertEqual(2, result["removed_blocks"])
+
     def test_reconciliation_preserves_federated_effective_module(self) -> None:
         current = {
             "_id": "landing",
@@ -181,6 +320,57 @@ class ApplyPlanTests(unittest.TestCase):
         with mock.patch.object(apply_plan.subprocess, "run", return_value=failed):
             with self.assertRaisesRegex(RuntimeError, "wrong project"):
                 apply_plan.run_preflight(Path("brief.json"), None)
+
+    def test_run_json_retries_pre_request_session_bootstrap_rate_limit(self) -> None:
+        limited = mock.Mock(
+            returncode=1,
+            stderr="publisher session bootstrap failed (HTTP 429)",
+            stdout="",
+        )
+        succeeded = mock.Mock(returncode=0, stderr="", stdout='{"ok":true}')
+        with (
+            mock.patch.object(
+                apply_plan.subprocess, "run", side_effect=[limited, limited, succeeded]
+            ) as run,
+            mock.patch.object(apply_plan.time, "sleep") as sleep,
+        ):
+            self.assertEqual({"ok": True}, apply_plan.run_json("config", "list"))
+        self.assertEqual(3, run.call_count)
+        self.assertEqual([mock.call(5), mock.call(10)], sleep.call_args_list)
+
+    def test_run_json_does_not_retry_ambiguous_operation_failure(self) -> None:
+        failed = mock.Mock(returncode=1, stderr="request failed (HTTP 429)", stdout="")
+        with (
+            mock.patch.object(apply_plan.subprocess, "run", return_value=failed) as run,
+            mock.patch.object(apply_plan.time, "sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "HTTP 429"):
+                apply_plan.run_json("shopbuilder", "update-block")
+        run.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_run_json_refreshes_supported_login_for_missing_cookie(self) -> None:
+        missing_cookie = mock.Mock(
+            returncode=1,
+            stderr="publisher session bootstrap did not yield a pa-v4-token cookie",
+            stdout="",
+        )
+        login_succeeded = mock.Mock(returncode=0, stderr="", stdout="Login successful")
+        operation_succeeded = mock.Mock(
+            returncode=0, stderr="", stdout='{"ok":true}'
+        )
+        with mock.patch.object(
+            apply_plan.subprocess,
+            "run",
+            side_effect=[missing_cookie, login_succeeded, operation_succeeded],
+        ) as run:
+            self.assertEqual(
+                {"ok": True}, apply_plan.run_json("shopbuilder", "get-structure")
+            )
+        self.assertEqual(3, run.call_count)
+        self.assertEqual(
+            ["xsolla", "auth", "login"], run.call_args_list[1].args[0]
+        )
 
     def test_ensure_locales_adds_only_missing_languages(self) -> None:
         before = {"languages": ["en-US"]}
