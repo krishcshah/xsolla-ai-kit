@@ -231,9 +231,20 @@ class ShopBriefTests(unittest.TestCase):
         }
         self.assertTrue(preflight.active_publisher_account(accounts))
         self.assertEqual(
-            {("known", "bundle")},
-            preflight.group_identities(
-                {"data": [{"external_id": "known", "type": "bundle"}]}
+            {"known"},
+            preflight.group_external_ids(
+                {
+                    "ok": True,
+                    "data": {
+                        "groups": [
+                            {
+                                "external_id": "known",
+                                "name": "Known group",
+                                "children": [],
+                            }
+                        ]
+                    },
+                }
             ),
         )
 

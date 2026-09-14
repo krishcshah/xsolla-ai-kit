@@ -63,12 +63,18 @@ def active_publisher_account(value: object) -> bool:
     )
 
 
-def group_identities(value: object) -> set[tuple[str, str]]:
+def group_external_ids(value: object) -> set[str]:
+    """Return group IDs from the storefront response.
+
+    ``catalog list-item-groups`` does not return an item ``type`` for a group.
+    The requested type remains part of the Shop Builder section mapping, while
+    preflight can only verify that its referenced group ID exists.
+    """
+
     return {
-        (item["external_id"], item["type"])
+        item["external_id"]
         for item in objects(data(value))
         if isinstance(item.get("external_id"), str)
-        and isinstance(item.get("type"), str)
     }
 
 
@@ -170,13 +176,17 @@ def main() -> int:
             "--project-id",
             str(expected["project_id"]),
         )
-        available_groups = group_identities(groups)
+        available_group_ids = group_external_ids(groups)
         requested_groups = {
             (group["external_id"], group["type"])
             for group in brief["catalog"]["groups"]
             if group["external_id"] != "__all__"
         }
-        missing_groups = sorted(requested_groups - available_groups)
+        missing_groups = sorted(
+            (external_id, group_type)
+            for external_id, group_type in requested_groups
+            if external_id not in available_group_ids
+        )
         if missing_groups:
             raise RuntimeError(
                 "catalog groups do not exist in the configured project: "
