@@ -27,10 +27,20 @@ BACKUP_FILE_NAMES = {
     "versions.json",
 }
 SESSION_BOOTSTRAP_RETRY_DELAYS = (5, 10, 20)
+LOGIN_SETTLE_SECONDS = 2
+
+
+def refresh_supported_login() -> None:
+    result = subprocess.run(["xsolla", "auth", "login"], check=False)
+    if result.returncode:
+        raise RuntimeError("supported Publisher login refresh failed")
+    time.sleep(LOGIN_SETTLE_SECONDS)
 
 
 def run_json(*args: str) -> object:
     command = ["xsolla", *args, "--json"]
+    if args and args[0] == "shopbuilder":
+        refresh_supported_login()
     rate_limit_attempt = 0
     refreshed_login = False
     while True:
@@ -51,17 +61,7 @@ def run_json(*args: str) -> object:
             "publisher session bootstrap did not yield" in detail
         )
         if missing_bootstrap_cookie and not refreshed_login:
-            login = subprocess.run(
-                ["xsolla", "auth", "login"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if login.returncode:
-                login_detail = login.stderr.strip() or login.stdout.strip()
-                raise RuntimeError(
-                    "supported Publisher login refresh failed: " + login_detail
-                )
+            refresh_supported_login()
             refreshed_login = True
             continue
         if "publisher session bootstrap" in detail:

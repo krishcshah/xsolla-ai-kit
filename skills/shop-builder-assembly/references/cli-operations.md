@@ -22,11 +22,12 @@ project overrides after preflight.
 | Verify | `get-structure`, `get-localization`, `verify-website` | Slug | Plan comparison and readiness result |
 | Preview | `enable-preview`, `preview-link` | Slug | Human-reviewable preview only |
 
-If an authenticated command reports that Publisher session bootstrap produced no
-session cookie before the operation was issued, `apply_plan.py` performs one bounded
-refresh through `xsolla auth login` and retries that command. It never reads a browser
-cookie, never accepts a manually copied PA token, and does not retry ambiguous API
-operation failures. Session-bootstrap HTTP 429 responses use bounded backoff.
+Before each Shop Builder command, `apply_plan.py` refreshes the supported
+Publisher login through `xsolla auth login`. If a read reports that session bootstrap
+produced no cookie before the operation was issued, it performs one bounded refresh
+and retries that read. It never reads a browser cookie, never accepts a manually copied
+PA token, and does not retry ambiguous API operation failures. Session-bootstrap HTTP
+429 responses use bounded backoff.
 
 ## ID dependencies
 

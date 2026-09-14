@@ -340,14 +340,40 @@ class ApplyPlanTests(unittest.TestCase):
 
     def test_run_json_does_not_retry_ambiguous_operation_failure(self) -> None:
         failed = mock.Mock(returncode=1, stderr="request failed (HTTP 429)", stdout="")
+        login_succeeded = mock.Mock(returncode=0, stderr="", stdout="Login successful")
         with (
-            mock.patch.object(apply_plan.subprocess, "run", return_value=failed) as run,
+            mock.patch.object(
+                apply_plan.subprocess,
+                "run",
+                side_effect=[login_succeeded, failed],
+            ) as run,
             mock.patch.object(apply_plan.time, "sleep") as sleep,
         ):
             with self.assertRaisesRegex(RuntimeError, "HTTP 429"):
                 apply_plan.run_json("shopbuilder", "update-block")
-        run.assert_called_once()
-        sleep.assert_not_called()
+        self.assertEqual(2, run.call_count)
+        sleep.assert_called_once_with(apply_plan.LOGIN_SETTLE_SECONDS)
+
+    def test_run_json_refreshes_login_before_shopbuilder_command(self) -> None:
+        login_succeeded = mock.Mock(returncode=0, stderr="", stdout="Login successful")
+        operation_succeeded = mock.Mock(
+            returncode=0, stderr="", stdout='{"ok":true}'
+        )
+        with (
+            mock.patch.object(
+                apply_plan.subprocess,
+                "run",
+                side_effect=[login_succeeded, operation_succeeded],
+            ) as run,
+            mock.patch.object(apply_plan.time, "sleep") as sleep,
+        ):
+            self.assertEqual(
+                {"ok": True}, apply_plan.run_json("shopbuilder", "get-structure")
+            )
+        self.assertEqual(
+            ["xsolla", "auth", "login"], run.call_args_list[0].args[0]
+        )
+        sleep.assert_called_once_with(apply_plan.LOGIN_SETTLE_SECONDS)
 
     def test_run_json_refreshes_supported_login_for_missing_cookie(self) -> None:
         missing_cookie = mock.Mock(
@@ -359,17 +385,32 @@ class ApplyPlanTests(unittest.TestCase):
         operation_succeeded = mock.Mock(
             returncode=0, stderr="", stdout='{"ok":true}'
         )
-        with mock.patch.object(
-            apply_plan.subprocess,
-            "run",
-            side_effect=[missing_cookie, login_succeeded, operation_succeeded],
-        ) as run:
+        with (
+            mock.patch.object(
+                apply_plan.subprocess,
+                "run",
+                side_effect=[
+                    login_succeeded,
+                    missing_cookie,
+                    login_succeeded,
+                    operation_succeeded,
+                ],
+            ) as run,
+            mock.patch.object(apply_plan.time, "sleep") as sleep,
+        ):
             self.assertEqual(
                 {"ok": True}, apply_plan.run_json("shopbuilder", "get-structure")
             )
-        self.assertEqual(3, run.call_count)
+        self.assertEqual(4, run.call_count)
         self.assertEqual(
-            ["xsolla", "auth", "login"], run.call_args_list[1].args[0]
+            ["xsolla", "auth", "login"], run.call_args_list[2].args[0]
+        )
+        self.assertEqual(
+            [
+                mock.call(apply_plan.LOGIN_SETTLE_SECONDS),
+                mock.call(apply_plan.LOGIN_SETTLE_SECONDS),
+            ],
+            sleep.call_args_list,
         )
 
     def test_ensure_locales_adds_only_missing_languages(self) -> None:
