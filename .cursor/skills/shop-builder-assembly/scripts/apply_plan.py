@@ -28,13 +28,29 @@ BACKUP_FILE_NAMES = {
 }
 SESSION_BOOTSTRAP_RETRY_DELAYS = (5, 10, 20)
 LOGIN_SETTLE_SECONDS = 2
+LOGIN_TIMEOUT_SECONDS = 45
+LOGIN_RETRY_DELAY_SECONDS = 5
 
 
 def refresh_supported_login() -> None:
-    result = subprocess.run(["xsolla", "auth", "login"], check=False)
-    if result.returncode:
-        raise RuntimeError("supported Publisher login refresh failed")
-    time.sleep(LOGIN_SETTLE_SECONDS)
+    for attempt in range(2):
+        try:
+            result = subprocess.run(
+                ["xsolla", "auth", "login"],
+                check=False,
+                timeout=LOGIN_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            if attempt == 0:
+                time.sleep(LOGIN_RETRY_DELAY_SECONDS)
+                continue
+            raise RuntimeError("supported Publisher login refresh timed out") from None
+        if result.returncode == 0:
+            time.sleep(LOGIN_SETTLE_SECONDS)
+            return
+        if attempt == 0:
+            time.sleep(LOGIN_RETRY_DELAY_SECONDS)
+    raise RuntimeError("supported Publisher login refresh failed")
 
 
 def run_json(*args: str) -> object:
@@ -223,6 +239,14 @@ def reconcile_page(slug: str, landing_id: str, page_plan: dict) -> dict:
             "current page requires unconfirmed block removals; back up, re-render, "
             f"and reconfirm the plan ({details})"
         )
+    current_modules = [effective_module(block) for block in blocks]
+    if not removals and current_modules == desired:
+        return {
+            "path": page_plan["path"],
+            "page_id": page_id,
+            "blocks": current_modules,
+            "removed_blocks": 0,
+        }
     if removals:
         removal_ids = {block["_id"] for block in removals}
         removal_indexes = sorted(
@@ -345,6 +369,12 @@ def ensure_locales(slug: str, desired: list[str]) -> dict:
         run_json("shopbuilder", "add-language", "--slug", slug, "--language", locale)
         added.append(locale)
         languages.append(locale)
+    if not added:
+        return {
+            "requested": desired,
+            "added": [],
+            "preserved_extra": sorted(set(languages) - set(desired)),
+        }
     refreshed = structure(slug)
     final_languages = refreshed.get("languages")
     if (
@@ -505,6 +535,28 @@ def apply_navigation(slug: str, landing_id: str, plan: dict) -> list[dict]:
         )
         if not isinstance(header, dict) or not isinstance(header.get("_id"), str):
             raise RuntimeError(f"page {page_plan['path']} has no header block")
+        components = header.get("values", {}).get("components", {})
+        right = header.get("values", {}).get("rightComponents", [])
+        actual_page_ids = [
+            components[component_id].get("button", {}).get("action", {}).get("pageId")
+            for component_id in right
+            if isinstance(components.get(component_id), dict)
+            and components[component_id].get("type") == "button"
+            and components[component_id]
+            .get("button", {})
+            .get("action", {})
+            .get("action")
+            == "page"
+        ]
+        results.append(
+            {
+                "path": page_plan["path"],
+                "header_id": header["_id"],
+                "target_page_ids": expected_page_ids,
+            }
+        )
+        if actual_page_ids == expected_page_ids:
+            continue
         patches, labels = header_navigation_patches(
             header, landing_id, page["_id"], plan["navigation"]
         )
@@ -513,7 +565,8 @@ def apply_navigation(slug: str, landing_id: str, plan: dict) -> list[dict]:
             {"path": page_plan["path"], "header_id": header["_id"], "patches": patches}
         )
 
-    update_localized_label_scopes(slug, labels_by_page, plan["locales"])
+    if labels_by_page:
+        update_localized_label_scopes(slug, labels_by_page, plan["locales"])
     for operation in operations:
         run_json(
             "shopbuilder",
@@ -531,13 +584,6 @@ def apply_navigation(slug: str, landing_id: str, plan: dict) -> list[dict]:
                 },
                 separators=(",", ":"),
             ),
-        )
-        results.append(
-            {
-                "path": operation["path"],
-                "header_id": operation["header_id"],
-                "target_page_ids": expected_page_ids,
-            }
         )
 
     refreshed = structure(slug)
@@ -684,6 +730,12 @@ def wire_catalog_sections(slug: str, landing_id: str, plan: dict) -> list[dict]:
             if not isinstance(block_id, str):
                 raise RuntimeError("newStore block has no _id")
             patches = catalog_patches(block.get("components"), plan["catalog_sections"])
+            actual = [
+                store_section_identity(component)
+                for component in block.get("components", [])
+            ]
+            if actual == desired:
+                patches = []
             if patches:
                 run_json(
                     "shopbuilder",

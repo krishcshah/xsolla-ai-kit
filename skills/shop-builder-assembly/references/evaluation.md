@@ -40,3 +40,12 @@ writes.
 The command passes only with at least 10 valid runs, at least 80% successes, and no
 run exceeding two manual interventions. Preserve failed runs; do not rerun and replace
 them merely to improve the result.
+
+## SB-8796 result
+
+The committed matrix contains 10 runs: nine successes and the preserved initial
+failure. The success rate is 90%, all three presets are represented three times, and
+the maximum manual-intervention count is two. Each success has an exact post-apply
+structure export and a fresh authenticated Publisher Account preview; every site
+remained unpublished. Run `scripts/summarize_evals.py evals/runs.jsonl` to reproduce
+the metric result.

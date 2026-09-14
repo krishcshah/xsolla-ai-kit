@@ -4,6 +4,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -222,6 +223,34 @@ class ApplyPlanTests(unittest.TestCase):
                 apply_plan.reconcile_page("shop", "landing", plan)
             run_json.assert_not_called()
 
+    def test_reconciliation_returns_immediately_for_exact_page(self) -> None:
+        current = {
+            "pages": [
+                {
+                    "_id": "home",
+                    "path": "/",
+                    "blocks": [
+                        {"_id": "header", "module": "header"},
+                        {"_id": "footer", "module": "footer"},
+                    ],
+                }
+            ]
+        }
+        plan = {
+            "name": "Home",
+            "path": "/",
+            "blocks": ["header", "footer"],
+            "removals": [],
+        }
+        with (
+            mock.patch.object(apply_plan, "structure", return_value=current) as structure,
+            mock.patch.object(apply_plan, "run_json") as run_json,
+        ):
+            result = apply_plan.reconcile_page("shop", "landing", plan)
+        structure.assert_called_once_with("shop")
+        run_json.assert_not_called()
+        self.assertEqual(["header", "footer"], result["blocks"])
+
     def test_reconciliation_batches_confirmed_removals_in_descending_order(self) -> None:
         current = {
             "_id": "landing",
@@ -412,6 +441,19 @@ class ApplyPlanTests(unittest.TestCase):
             ],
             sleep.call_args_list,
         )
+
+    def test_supported_login_times_out_after_one_retry(self) -> None:
+        timeout = subprocess.TimeoutExpired(["xsolla", "auth", "login"], 45)
+        with (
+            mock.patch.object(
+                apply_plan.subprocess, "run", side_effect=[timeout, timeout]
+            ) as run,
+            mock.patch.object(apply_plan.time, "sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "timed out"):
+                apply_plan.refresh_supported_login()
+        self.assertEqual(2, run.call_count)
+        sleep.assert_called_once_with(apply_plan.LOGIN_RETRY_DELAY_SECONDS)
 
     def test_ensure_locales_adds_only_missing_languages(self) -> None:
         before = {"languages": ["en-US"]}

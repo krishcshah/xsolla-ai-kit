@@ -3,10 +3,12 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -313,6 +315,19 @@ class ShopBriefTests(unittest.TestCase):
                 "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
                 backup_shop.checksum(path),
             )
+
+    def test_backup_supported_login_times_out_after_one_retry(self) -> None:
+        timeout = subprocess.TimeoutExpired(["xsolla", "auth", "login"], 45)
+        with (
+            mock.patch.object(
+                backup_shop.subprocess, "run", side_effect=[timeout, timeout]
+            ) as run,
+            mock.patch.object(backup_shop.time, "sleep") as sleep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "timed out"):
+                backup_shop.refresh_supported_login()
+        self.assertEqual(2, run.call_count)
+        sleep.assert_called_once_with(backup_shop.LOGIN_RETRY_DELAY_SECONDS)
 
     def test_eval_targets_pass_at_eight_of_ten(self) -> None:
         runs = [

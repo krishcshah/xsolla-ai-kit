@@ -9,17 +9,67 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from validate_shop_brief import load_brief, validate
 
+SESSION_BOOTSTRAP_RETRY_DELAYS = (5, 10, 20)
+LOGIN_SETTLE_SECONDS = 2
+LOGIN_TIMEOUT_SECONDS = 45
+LOGIN_RETRY_DELAY_SECONDS = 5
+
+
+def refresh_supported_login() -> None:
+    """Refresh the supported CLI login without handling or copying PA tokens."""
+    for attempt in range(2):
+        try:
+            result = subprocess.run(
+                ["xsolla", "auth", "login"],
+                check=False,
+                timeout=LOGIN_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            if attempt == 0:
+                time.sleep(LOGIN_RETRY_DELAY_SECONDS)
+                continue
+            raise RuntimeError("supported Publisher login refresh timed out") from None
+        if result.returncode == 0:
+            time.sleep(LOGIN_SETTLE_SECONDS)
+            return
+        if attempt == 0:
+            time.sleep(LOGIN_RETRY_DELAY_SECONDS)
+    raise RuntimeError("supported Publisher login refresh failed")
+
 
 def run_json(*args: str) -> object:
     command = ["xsolla", *args, "--json"]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
-    if result.returncode:
+    if args and args[0] == "shopbuilder":
+        refresh_supported_login()
+    rate_limit_attempt = 0
+    refreshed_login = False
+    while True:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            break
         detail = result.stderr.strip() or result.stdout.strip()
+        retryable_bootstrap_limit = (
+            "publisher session bootstrap" in detail and "HTTP 429" in detail
+        )
+        if retryable_bootstrap_limit and rate_limit_attempt < len(
+            SESSION_BOOTSTRAP_RETRY_DELAYS
+        ):
+            time.sleep(SESSION_BOOTSTRAP_RETRY_DELAYS[rate_limit_attempt])
+            rate_limit_attempt += 1
+            continue
+        missing_bootstrap_cookie = (
+            "publisher session bootstrap did not yield" in detail
+        )
+        if missing_bootstrap_cookie and not refreshed_login:
+            refresh_supported_login()
+            refreshed_login = True
+            continue
         if "publisher session bootstrap" in detail:
             detail += (
                 "; refresh the supported Publisher login with `xsolla auth login` "

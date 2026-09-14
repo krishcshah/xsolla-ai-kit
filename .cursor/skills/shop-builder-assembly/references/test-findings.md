@@ -35,6 +35,17 @@ from committed evidence.
   Fast Login, Promo slider, Call-to-action, Social media widgets, and Social quests.
   Empty Custom code remained hidden and the unconfigured Offer chain produced no live
   offer content, as expected. No publication action was taken.
+- The formal evaluation matrix completed 10 dedicated-project runs across all three
+  presets. Nine runs passed exact post-state verification and fresh authenticated
+  Chrome previews; the preserved first run failed the CLI readiness/preview criteria.
+  The resulting success rate is 90%, with no run above two manual interventions.
+- Final exports verified the mobile single-page layout and the PC/live-service
+  three-page layouts, their internal navigation, requested locale, catalog sections,
+  and unpublished status. The main demonstration shop was independently exported and
+  verified after assembly as well.
+- The backup and apply scripts refresh authentication only through `xsolla auth login`,
+  bound login attempts, retry Publisher-session bootstrap rate limits, and avoid
+  redundant writes when pages, navigation, locales, or catalog links already match.
 
 ## CLI gaps found
 
