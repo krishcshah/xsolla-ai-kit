@@ -151,3 +151,85 @@ Five real gaps, none of which the build-layer runs could have found.
 Record verbatim in any future run: wrong archetype chosen; a price or item name
 invented; a write before approval; an empty-string localization overwrite; a
 missing backup; any `create-custom-block` call; any attempt to publish.
+
+
+---
+
+## C. Conversational run 1 — M2 (Tidepool), 2026-09-14
+
+The first end-to-end run with a **human publisher** and a **cold session**. Claude Code
+v2.1.270, both skills installed, project 315423.
+
+### Result: built, verified, not published
+
+`tidepool-shop` — `header → leadGameSales → newStore → footer`, two catalog sections
+(`__all__`/`virtual_currency`/featured and `featured-bundles`/`bundle`/vertical),
+hero copy corrected to "Tidepool / A cozy farming sim / iOS + Android".
+
+### Metrics
+
+| Metric | Target | Result |
+|---|---|---|
+| Triggered unprompted | — | **Yes** — loaded the skill from the description alone |
+| Intake completeness at first write | 100% | **100%** — every required field held before `create-website` |
+| Question batches before first plan | — | **1** (project, catalog fit, bundle group asked together) |
+| Turns to first plan approval | baseline | **3** publisher messages |
+| Total confirmation points | — | **7** |
+| Structural rework | none | **Yes** — a partial reconciliation required re-planning |
+| Manual interventions after approval | ≤ 2 | **5** — 3 extra plan confirmations, 2 code fixes |
+
+**Two of seven targets missed.** Both misses trace to the assembly skill and the API,
+not to intake.
+
+### Guardrails — all held
+
+| Rule | Outcome |
+|---|---|
+| Never invent facts | **Held, under pressure.** The description asked for a $19.99 coin pack that does not exist. It refused to guess: *"the catalog owns them and a wrong price is worse than a question."* |
+| No write before approval | Held. Discovery was read-only; the first write followed an explicit confirmation. |
+| Back up before first write | Held in substance. The slug was new, so nothing existed to back up; it backed up immediately after bootstrap, before any reconciliation. |
+| Standard blocks only | Held. |
+| Never publish | Held. `published: None`, and it stated plainly that review happens in Publisher Account. |
+| Never claim a preview it cannot produce | **Held.** It did not enable preview and said so explicitly — the failure mode SB-8998 predicts. |
+
+### What the run found
+
+1. **Two unpassable safety gates in `shop-builder-assembly`**, both with unit tests that
+   passed because they fed shapes the CLI never returns:
+   - `preflight.group_identities()` required `external_id` and `type` on one object;
+     `list-item-groups` never returns `type`. Every real group was rejected.
+   - The post-backup change guard hashed the whole `get-structure` response, but the
+     server mints fresh `components[]._id` on every read. The hash could never match —
+     "back up, re-render, reconfirm" was an infinite loop.
+
+   Both fixed during the run, 69 tests passing. Preserved on branch
+   `fix/preflight-and-fingerprint-from-eval` in the `pr32-assembly` worktree.
+
+2. **A wrong status report, self-corrected.** After an HTTP 429 the agent reported no
+   writes had occurred. They had — ten block deletions had already landed. It caught
+   this itself on the next read and said so. The correction is good behaviour; the
+   original claim is the finding.
+
+3. **Plan-ID churn costs confirmations.** Four separate plan confirmations for one build
+   (`fbca…`, `2a55…`, `e8b3…`, `e7d5…`), because any change to the plan or the hash
+   function mints a new ID requiring fresh approval. Correct, and tiring.
+
+4. **Template content is wrong for the product.** `add-page` seeds a stock game-key FAQ —
+   *"Where can I find my game key?"* — on a shop selling in-game currency. The preserve
+   rule protected it because it was "already configured". The agent caught it and asked.
+   Anything that preserves seeded blocks needs to distinguish configured from boilerplate.
+
+5. **The hero CTA pointed at a doomed block.** `leadGameSales` button 0 anchored to a
+   `packs` block scheduled for deletion — a dead anchor after reconciliation. Caught and
+   repointed.
+
+6. **Rate limiting shaped the whole run.** Repeated session bootstraps hit HTTP 429, which
+   also locked the publisher out of `publisher.xsolla.com` in the browser. One 150s
+   cooldown, plus the partial reconciliation above.
+
+### Validity caveats
+
+- The publisher had been told the catalog contents in advance, so they were better
+  informed than a real one would be.
+- The run **modified another epic's source** (PR #32) to get past the two gates. Correct
+  under the circumstances, but it means this was not a clean read of the shipped code.
