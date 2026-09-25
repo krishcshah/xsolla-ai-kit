@@ -1,10 +1,9 @@
 # description-to-shop
 
 Turns a plain-language game description into a validated Shop Builder assembly brief.
-The shared `shop-builder-assembly` skill performs the plan, backup, CLI writes,
-verification, and preview workflow.
+`shop-builder-assembly` performs the plan, backup, CLI writes, verification and preview.
 
-Tracking: **SB-8786**. Integration dependency: **SB-8796 / PR #32** must merge first.
+Tracking: **SB-8786**. Depends on **SB-8796 / PR #32**, which must merge first.
 
 ## Prerequisites
 
@@ -17,26 +16,24 @@ Tracking: **SB-8786**. Integration dependency: **SB-8796 / PR #32** must merge f
 
 1. Give the agent a plain-language game description.
 2. Answer one batch of genuinely missing factual questions.
-3. Review the normalized brief produced from
-   `references/intake-schema.md` and the assembly brief contract.
-4. Continue with `shop-builder-assembly`; review and confirm its exact plan hash.
-5. Inspect the unpublished result using the editor/preview handoff returned by the
-   assembly skill.
+3. Review the normalized brief.
+4. Continue with `shop-builder-assembly`; confirm its exact plan hash.
+5. Inspect the unpublished result via the editor/preview handoff it returns.
 
 ## Known limitations
 
-- This skill does not create catalog entities or translate unapproved copy.
-- Requests with no standard block are reported rather than approximated.
-- Shop Builder assembly, safety, and CLI limitations are documented centrally in
-  `shop-builder-assembly`; they are not duplicated here.
+- Creates no catalog entities and translates no unapproved copy.
+- Requests with no standard block are reported, never approximated.
+- Shop Builder assembly, safety and CLI limitations live in `shop-builder-assembly`
+  and are not duplicated here.
 - Publication remains a human action in Publisher Account.
 
 ## Layout
 
 ```
-SKILL.md                       intake and handoff workflow
-README.md                      prerequisites and happy path
-references/intake-schema.md    facts to collect and completeness gate
-references/plan-format.md      normalized handoff example
-../../evals/description-to-shop/   test inputs, run log, how to run
+SKILL.md                            intake and handoff workflow
+README.md                           this file
+references/intake-schema.md         facts to collect, completeness gate
+references/plan-format.md           normalized handoff example
+../../evals/description-to-shop/    test inputs, run log, how to run
 ```
