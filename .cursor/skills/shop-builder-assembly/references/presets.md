@@ -14,10 +14,11 @@ Use for mobile-first games and focused top-up or item purchase journeys.
 - Defaults: compact hero, high-contrast CTA, short FAQ, minimal outbound navigation.
 - Required data: logo or game name, hero copy, at least one catalog group, locale.
 
-## PC multi-page portal
+## PC multi-page shop
 
 Use when the shop also needs game information, media, requirements, or multiple
-catalog entry points.
+catalog entry points. This is a Shop Builder shop, not the Game Web Portal owned by
+the agentic-onboarding flow.
 
 - `/` Home: `header → leadGameSales → description → gallery → footer`
 - `/store` Store: `header → newStore → faq → footer`
@@ -53,5 +54,5 @@ unit. Do not invent event dates, discounts, scarcity, or eligibility.
 | Preset | Reviewer | Date | Status |
 |---|---|---|---|
 | Mobile single page | Andrey Pyanzin | TBD | Draft; review pending |
-| PC multi-page portal | Andrey Pyanzin | TBD | Draft; review pending |
+| PC multi-page shop | Andrey Pyanzin | TBD | Draft; review pending |
 | Live service with bundles and events | Andrey Pyanzin | TBD | Draft; review pending |

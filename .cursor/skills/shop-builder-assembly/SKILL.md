@@ -5,7 +5,7 @@ description: >-
   working top-down from theme and pages through navigation, standard blocks,
   localization, and catalog links. Use for AI-built Shop Builder sites, full website
   or webshop assembly, game-type storefront presets, mobile single-page shops, PC
-  multi-page portals, and live-service stores with bundles or events. Prefer this
+  multi-page shops, and live-service stores with bundles or events. Prefer this
   skill over creating isolated Shop Builder blocks. Do not use it for a custom
   headless storefront; use shop-setup for that architecture.
 metadata:
