@@ -38,5 +38,5 @@ SKILL.md                       intake and handoff workflow
 README.md                      prerequisites and happy path
 references/intake-schema.md    facts to collect and completeness gate
 references/plan-format.md      normalized handoff example
-evals/                         description-intake test inputs and results
+../../evals/description-to-shop/   test inputs, run log, how to run
 ```
