@@ -17,10 +17,12 @@ Required fields:
 - `manual_interventions`: count of user or engineer actions needed after confirmation.
 - `failure`: concise failure cause for failed runs; `null` is allowed for success.
 
-Store the completed log as `evals/runs.jsonl`, then run:
+Store the completed log at repository root as
+`evals/shop-builder-assembly/runs.jsonl`, then run:
 
 ```bash
-python3 scripts/summarize_evals.py evals/runs.jsonl
+python3 skills/shop-builder-assembly/scripts/summarize_evals.py \
+  evals/shop-builder-assembly/runs.jsonl
 ```
 
 After recording run 001, prepare a balanced local matrix for runs 002–010 with:
@@ -47,5 +49,4 @@ The committed matrix contains 10 runs: nine successes and the preserved initial
 failure. The success rate is 90%, all three presets are represented three times, and
 the maximum manual-intervention count is two. Each success has an exact post-apply
 structure export and a fresh authenticated Publisher Account preview; every site
-remained unpublished. Run `scripts/summarize_evals.py evals/runs.jsonl` to reproduce
-the metric result.
+remained unpublished. Run the command above to reproduce the metric result.

@@ -8,9 +8,7 @@ This file is read automatically by most AI coding agents (Cursor, Codex CLI, Git
 
 `xsolla/xsolla-ai-kit` is the Xsolla agent skills toolkit — a collection of `SKILL.md` files (agentskills.io format) that teach AI coding agents how to execute Xsolla-specific workflows end-to-end, without requiring the Xsolla CLI as a dependency.
 
-Most skills call **Xsolla REST APIs directly**. Shop Builder assembly is the explicit
-exception: the SB AI epics require its writes to go through pre-written workflows in
-`xsolla/xsolla-cli`, including CLI login and approved-test-environment safety checks.
+Skills call **Xsolla REST APIs directly**. The CLI (`xsolla/xsolla-cli`) is an optional shortcut once it ships to production.
 
 ---
 

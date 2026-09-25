@@ -7,9 +7,8 @@ from a normalized JSON shop brief.
 
 - Xsolla CLI with `shopbuilder` commands
 - `xsolla auth login` completed for a Publisher account
-- Sandbox IDs or an explicitly acknowledged dedicated test project configured
+- Sandbox IDs or an acknowledged dedicated test project
 - Existing catalog group IDs for any `newStore` sections
-- A dedicated test project; never use a partner live project
 - For a non-sandbox test project, a separate local approval allowlist containing the
   exact merchant/project identity and the mentor or lead's approval reference
 
@@ -31,8 +30,7 @@ from a normalized JSON shop brief.
    python3 scripts/backup_shop.py --brief brief.json --slug my-shop --output-dir ./backups/my-shop
    ```
 
-4. Render the target-bound plan, review its exact block removals, and explicitly
-   confirm its `confirmation_id`:
+4. Render the target-bound plan, review removals, and confirm its `confirmation_id`:
 
    ```bash
    python3 scripts/render_plan.py brief.json --structure ./backups/my-shop/structure.json
@@ -42,10 +40,9 @@ from a normalized JSON shop brief.
    ```
 
    For a new slug, render without `--structure` and confirm the bootstrap-only plan.
-   Bootstrap creates the landing and all requested page paths. Afterward, back up the
-   generated templates and repeat this step with `--structure` before any template
-   blocks are removed. An existing site that is missing requested page paths uses the
-   same re-backup/reconfirmation boundary after those paths are created.
+   Bootstrap creates the landing and page paths. Then back up generated templates and
+   repeat with `--structure` before removing blocks. Use the same re-backup and
+   reconfirmation boundary after adding missing paths to an existing site.
 
 5. Follow the confirmed assembly sequence in `SKILL.md`; verify and preview, but do
    not publish. Export a fresh post-apply structure and compare it with the exact
@@ -59,16 +56,14 @@ from a normalized JSON shop brief.
 6. For formal runs, append the result using `references/evaluation.md` and check the
    metrics with `scripts/summarize_evals.py`.
 
-To sanitize the structural block contracts from a UI-created export without retaining
-IDs, copy, account data, or URLs, run `scripts/extract_block_contracts.py` with
-`--output` and reconcile its output with `references/block-catalog.md`. Federated
-wrappers are reported under their effective `values.blockId` module.
+To sanitize a UI-created export without retaining IDs, copy, account data, or URLs,
+run `scripts/extract_block_contracts.py --output ...` and reconcile it with the block
+catalog. Federated wrappers use their effective `values.blockId` module.
 
 ## Known limitations
 
-- Formal reviewer approval of the standard block inventory and three presets is
-  recorded during the PR phase; it is not required to begin implementation testing.
-- Use `references/expert-review.md` to record the eventual review and its evidence.
+- Record formal inventory and preset approval in `references/expert-review.md` during
+  PR review; implementation testing may start earlier.
 - Test project IDs are intentionally not stored in committed examples.
 - A `test` brief is insufficient on its own: preflight and apply also require a
   separate, uncommitted allowlist record for the exact merchant/project IDs. Sandbox
@@ -82,14 +77,11 @@ wrappers are reported under their effective `values.blockId` module.
   module has a UI-created exported contract. Subscriptions is documented but absent
   from the observed palette/export, while five palette entries are absent from the
   official block page.
-- The current apply script implements pages, navigation, blocks, requested locales,
-  and catalog-section links. Catalog sections use targeted component patches, disable
-  titles until approved localized text exists, and are re-read after each application.
-  `verify_structure.py` checks target identity, page paths, block order,
-  retained/removal IDs, navigation targets, catalog mappings, locales, and unpublished
-  state. Optional theme and copy/asset application remain blocked on stable normalized
-  input fields and final contract acceptance; CLI readiness and preview remain tracked
-  gaps.
+- Apply covers pages, navigation, blocks, locales, and catalog links. Catalog patches
+  are targeted, disable unapproved titles, and are re-read. Verification checks target,
+  paths, block order, retained/removal IDs, navigation, catalog, locales, and unpublished
+  state. Theme and copy/assets await stable normalized inputs and contract acceptance;
+  CLI readiness and preview remain tracked gaps.
 - The Description caller is integrated in its draft PR by producing this skill's brief
   and removing duplicate assembly scripts. External Store and Figma caller skills are
   tracked separately and are not yet present in this repository.
