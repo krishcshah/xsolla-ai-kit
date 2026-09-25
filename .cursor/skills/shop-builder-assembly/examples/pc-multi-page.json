@@ -11,8 +11,8 @@
     "lifecycle": "evergreen"
   },
   "site": {
-    "name": "Iron Frontier Portal",
-    "slug": "iron-frontier-portal",
+    "name": "Iron Frontier Shop",
+    "slug": "iron-frontier-shop",
     "preset": "pc-multi-page",
     "primary_locale": "en-US",
     "locales": ["en-US"]

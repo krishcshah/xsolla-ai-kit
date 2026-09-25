@@ -32,7 +32,7 @@ def fixture_content(preset: str, run_id: str) -> dict:
         return {
             **common,
             "description": {
-                "text": f"Synthetic PC portal content for {run_id}",
+                "text": f"Synthetic PC shop content for {run_id}",
                 "status": "approved-test-fixture",
             },
             "requirements": {
