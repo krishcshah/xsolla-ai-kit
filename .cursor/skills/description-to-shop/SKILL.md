@@ -27,7 +27,9 @@ Use the publisher's working project, not the installed plugin directory. The hel
 `.env` routing keys and `.xsolla/onboarding.json` only; it makes no writes or API calls.
 On an error, stop and report it rather than restarting the interview. For `portal`, hand
 off to `game-web-portal` and stop here. A missing ledger on the shop path permits normal
-intake from the conversation. A loaded ledger supplies already-confirmed answers.
+intake from the conversation. A loaded ledger supplies already-confirmed answers. A value
+that contradicts the ledger without an explicit correction is a conflict: keep the ledger
+value, ask one question that shows both values, and wait for the answer.
 
 ## 1. Extract the description
 
