@@ -38,16 +38,3 @@ For the full acceptance run, continue with the verified catalog and normal assem
 gates on the approved test project. Record required questions across planning and shop
 intake: every provided answer should be requested only once. Plan approval is not a
 duplicate intake question. Do not publish or bypass assembly safeguards.
-
-## Evidence, 2026-10-15
-
-- Deterministic intake tests: 16 passed.
-- Existing assembly tests: 76 passed; portal tests: 37 passed; translation suite: passed
-  (81 smoke assertions).
-- Repository validator: 13 skills, zero errors or warnings.
-- Claude intake attempt with the prompt above, using an isolated working directory and
-  the configured test target: **blocked before model execution**. Claude reported
-  `OAuth session expired and could not be refreshed` (session
-  `c3da2a1a-6f1e-45d2-8783-3adce97d7e46`). No questions or API calls ran, so this is not an
-  agent-test pass. Retry after Claude login; the full test-project acceptance run remains
-  outstanding.
